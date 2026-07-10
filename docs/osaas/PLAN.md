@@ -12,7 +12,7 @@ into one commit — resumability depends on commit granularity.
       against actual 2.2.224 sources (TableLink, LinkedIndex,
       TableLinkConnection, SessionLocal, Parser.parseCreateLinkedTable,
       DbSettings, SourceCompiler groovy path). Record corrections in DESIGN.md.
-- [ ] 0.3 Baseline test proving per-row remote commit + no rollback
+- [x] 0.3 Baseline test proving per-row remote commit + no rollback
       propagation (two embedded dbs). Committed failing-expectation-flipped
       form described in DESIGN.md Tests #1.
 - [ ] 0.4 Run upstream linked-table tests (TestLinkedTable) — record baseline
