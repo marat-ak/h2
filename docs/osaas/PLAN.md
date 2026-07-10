@@ -20,8 +20,10 @@ into one commit — resumability depends on commit granularity.
 
 ## Phase 1 — Transactional linked tables
 
-- [ ] 1.1 Parser + CreateLinkedTable: accept `TRANSACTIONAL` option;
+- [x] 1.1 Parser + CreateLinkedTable: accept `TRANSACTIONAL` option;
       TableLink stores it; `getCreateSQL()` round-trips it; DDL test.
+      (ADR-10: option spelled AUTOCOMMIT OFF; upstream already parses/stores/
+      round-trips it — task delivered as verification + DDL round-trip test.)
 - [ ] 1.2 Per-session non-shared remote connection with autoCommit=false for
       transactional tables (bypass shareLinkedConnections, ADR-8).
 - [ ] 1.3 SessionLocal enlistment: commit → flush → remote commit → local

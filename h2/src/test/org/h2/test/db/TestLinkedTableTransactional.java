@@ -35,7 +35,64 @@ public class TestLinkedTableTransactional extends TestDb {
 
     @Override
     public void test() throws SQLException {
+        testAutoCommitOffDdlRoundTrip();
         testAutoCommitOffTransactional();
+    }
+
+    /**
+     * PLAN 1.1 (ADR-10): the AUTOCOMMIT OFF option must survive DDL
+     * round-trips - both in SCRIPT output and across a database reopen
+     * (linked tables are re-created from their meta SQL on startup).
+     */
+    private void testAutoCommitOffDdlRoundTrip() throws SQLException {
+        if (!config.memory && !config.networked) {
+            deleteDb("ltTxDdl");
+            try (Connection remoteKeep = DriverManager.getConnection("jdbc:h2:mem:ltRemoteDdl")) {
+                remoteKeep.createStatement().execute("CREATE TABLE TEST(ID INT)");
+                Connection conn = getConnection("ltTxDdl");
+                Statement stat = conn.createStatement();
+                stat.execute("CREATE LINKED TABLE LT('', 'jdbc:h2:mem:ltRemoteDdl', '', '', 'TEST') " +
+                        "AUTOCOMMIT OFF");
+                assertTrue(getLinkedTableSql(stat).contains("AUTOCOMMIT OFF"));
+                conn.close();
+                // reopen: the linked table is re-created from meta SQL
+                conn = getConnection("ltTxDdl");
+                stat = conn.createStatement();
+                assertTrue(getLinkedTableSql(stat).contains("AUTOCOMMIT OFF"));
+                stat.execute("DROP TABLE LT");
+                conn.close();
+            }
+            deleteDb("ltTxDdl");
+        }
+        try (Connection remoteKeep = DriverManager.getConnection("jdbc:h2:mem:ltRemoteDdl2")) {
+            remoteKeep.createStatement().execute("CREATE TABLE TEST(ID INT)");
+            try (Connection conn = DriverManager.getConnection("jdbc:h2:mem:ltLocalDdl2")) {
+                Statement stat = conn.createStatement();
+                // default (no option): no AUTOCOMMIT OFF in DDL
+                stat.execute("CREATE LINKED TABLE LT('', 'jdbc:h2:mem:ltRemoteDdl2', '', '', 'TEST')");
+                String sql = getLinkedTableSql(stat);
+                assertTrue(sql, !sql.contains("AUTOCOMMIT"));
+                stat.execute("DROP TABLE LT");
+                // explicit AUTOCOMMIT ON: same as default
+                stat.execute("CREATE LINKED TABLE LT('', 'jdbc:h2:mem:ltRemoteDdl2', '', '', 'TEST') " +
+                        "AUTOCOMMIT ON");
+                sql = getLinkedTableSql(stat);
+                assertTrue(sql, !sql.contains("AUTOCOMMIT"));
+                stat.execute("DROP TABLE LT");
+            }
+        }
+    }
+
+    private static String getLinkedTableSql(Statement stat) throws SQLException {
+        try (ResultSet rs = stat.executeQuery("SCRIPT NODATA")) {
+            while (rs.next()) {
+                String s = rs.getString(1);
+                if (s.contains("LINKED TABLE")) {
+                    return s;
+                }
+            }
+        }
+        throw new AssertionError("no LINKED TABLE found in SCRIPT output");
     }
 
     /**
