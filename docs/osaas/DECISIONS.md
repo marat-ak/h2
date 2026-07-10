@@ -48,3 +48,27 @@ tables keep sharing as today.
 ## ADR-9: Fork version `2.2.224-osaas.N` — accepted
 Monotonic N per released build. Published to local repo / GitHub packages as
 needed by OSaaSIntegrationsH2.
+
+## ADR-10: Reuse existing `AUTOCOMMIT OFF` linked-table option — accepted
+Phase-0 recon: 2.2.224 already parses `CREATE LINKED TABLE ... AUTOCOMMIT ON|OFF`
+(Parser.java ~8908, CreateLinkedTable.setAutoCommit, TableLink.autocommit) BUT it
+is a no-op: TableLinkConnection.setAutoCommit() (TableLinkConnection.java:151)
+only sets a field; the real java.sql.Connection autocommit is never changed and
+no commit/rollback is ever propagated to the remote side. Decision: instead of a
+new TRANSACTIONAL keyword, REPAIR `AUTOCOMMIT OFF` to real transactional
+semantics: real conn.setAutoCommit(false); non-shared per-table connection
+(ADR-8); enlist in SessionLocal commit/rollback (flush batches -> remote
+commit/rollback). Everywhere DESIGN.md says `TRANSACTIONAL`, read `AUTOCOMMIT
+OFF`. help.csv:880 already promises setAutoCommit passthrough, so this is a bug
+fix + semantics completion, upstream-friendly.
+
+## Phase-0 recon notes (verified against source)
+- LinkedIndex.add()/remove()/update() execute per-row via TableLink.execute();
+  batching goes here (PLAN 2.1).
+- TableLink.execute() has retry loop with reconnect; batch flush must integrate
+  with it carefully (no silent re-execute of half-flushed batch).
+- TableLink.preparedMap caches PreparedStatements by SQL — batch statement reuse
+  can build on it.
+- Database.getLinkConnection(...) + DbSettings.shareLinkedConnections control
+  sharing; TableLinkConnection.open(map, ..., shareLinkedConnections).
+- Build green: mvnw -DskipTests package OK on Java 17 (2026-07-10).
