@@ -15,7 +15,7 @@ into one commit — resumability depends on commit granularity.
 - [x] 0.3 Baseline test proving per-row remote commit + no rollback
       propagation (two embedded dbs). Committed failing-expectation-flipped
       form described in DESIGN.md Tests #1.
-- [ ] 0.4 Run upstream linked-table tests (TestLinkedTable) — record baseline
+- [x] 0.4 Run upstream linked-table tests (TestLinkedTable) — record baseline
       result in PROGRESS.md.
 
 ## Phase 1 — Transactional linked tables
