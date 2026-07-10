@@ -8,7 +8,7 @@ into one commit — resumability depends on commit granularity.
 ## Phase 0 — Bootstrap & baseline (no behavior change)
 
 - [x] 0.1 Build green: `mvn -f h2/pom.xml -DskipTests package` succeeds on Java 17.
-- [ ] 0.2 Source recon: verify/correct the "Touched code" table in DESIGN.md
+- [x] 0.2 Source recon: verify/correct the "Touched code" table in DESIGN.md
       against actual 2.2.224 sources (TableLink, LinkedIndex,
       TableLinkConnection, SessionLocal, Parser.parseCreateLinkedTable,
       DbSettings, SourceCompiler groovy path). Record corrections in DESIGN.md.

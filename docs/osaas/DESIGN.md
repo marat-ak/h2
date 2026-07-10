@@ -39,9 +39,13 @@ does not undo remote changes.
 
 New per-table options on `CREATE LINKED TABLE` plus global defaults:
 
+> **ADR-10 update:** the transactional option is spelled `AUTOCOMMIT OFF` —
+> reusing (and repairing) the option upstream 2.2.224 already parses but
+> ignores. Wherever this document says `TRANSACTIONAL`, read `AUTOCOMMIT OFF`.
+
 ```sql
 CREATE LINKED TABLE T('', 'jdbc:...', 'user', 'pw', 'REMOTE_TABLE')
-    TRANSACTIONAL          -- enlist remote connection in local tx
+    AUTOCOMMIT OFF         -- enlist remote connection in local tx (ADR-10)
     BATCH 500;             -- batch DML rows, flush every 500
 -- global defaults (db settings, also settable in the JDBC URL):
 SET LINKED_TABLE_TRANSACTIONAL TRUE;
@@ -83,17 +87,32 @@ Semantics:
 - Cross-statement batching (deferred update counts) — possible Phase-2 flag
   `BATCH DEFERRED`.
 
-### Touched code (expected; agent verifies and corrects in Phase 0)
+### Touched code (verified against 2.2.224 sources, Phase 0 recon 2026-07-10)
 
 | Area | File | Change |
 |---|---|---|
-| Parser | `org.h2.command.Parser` (`parseCreateLinkedTable`) | new options TRANSACTIONAL / BATCH n |
-| DDL | `org.h2.command.ddl.CreateLinkedTable` | carry options into TableLink |
-| Table | `org.h2.table.TableLink` | per-session connection mode, option storage, DDL round-trip in `getCreateSQL()` |
-| Index | `org.h2.index.LinkedIndex` | batch accumulation, flush triggers, shaped-statement reuse |
-| Conn | `org.h2.util.TableLinkConnection` | non-shared/transactional variant, autoCommit control |
-| Session | `org.h2.engine.SessionLocal` | enlisted-linked-connections list; hooks in commit()/rollback() |
-| Settings | `org.h2.engine.DbSettings` / `SetTypes` | LINKED_TABLE_TRANSACTIONAL, LINKED_TABLE_BATCH_SIZE |
+| Parser | `org.h2.command.Parser.parseCreateLinkedTable` (~L8872) | `AUTOCOMMIT ON\|OFF` ALREADY parsed (~L8908, ADR-10); add only `BATCH n` |
+| DDL | `org.h2.command.ddl.CreateLinkedTable` | `setAutoCommit` exists; add batch size carry-through |
+| Table | `org.h2.table.TableLink` | `autocommit` field exists but ineffective; per-session connection mode, `getCreateSQL()` already round-trips `AUTOCOMMIT OFF` (L421) |
+| Index | `org.h2.index.LinkedIndex` | batch accumulation in `add()`/`remove()`/`update()`, flush triggers, shaped-statement reuse |
+| Conn | `org.h2.table.TableLinkConnection` (NOT `org.h2.util` as first drafted) | `setAutoCommit()` (L151) only sets a field today — repair to drive real `Connection.setAutoCommit`; non-shared variant + commit/rollback passthrough |
+| Session | `org.h2.engine.SessionLocal` | hooks in `commit(boolean ddl)` (L678), `rollback()` (L797); cleanup in `close()` (L882). NB: `commit(true)` is also re-entered from `analyzeTables()` and `close()` — remote hooks must be idempotent/no-op when nothing enlisted |
+| Sharing | `org.h2.engine.Database.getLinkConnection` (L2187) + `DbSettings.shareLinkedConnections` (SHARE_LINKED_CONNECTIONS, default true) | bypass sharing when AUTOCOMMIT OFF (ADR-8) |
+| Settings | `org.h2.engine.DbSettings` / `org.h2.command.dml.SetTypes` | LINKED_TABLE_TRANSACTIONAL, LINKED_TABLE_BATCH_SIZE |
+
+Feature-2 recon:
+
+- `EXECUTE` parser branch at `Parser.java` L695: `EXECUTE IMMEDIATE <expr>` →
+  `org.h2.command.ddl.ExecuteImmediate` is the template for `EXECUTE GROOVY`
+  (GROOVY branch must be read before IMMEDIATE/Postgre fallbacks).
+- `org.h2.util.SourceCompiler.isGroovySource()` requires source starting with
+  `//groovy` or `@groovy` — the Groovy command must prepend `//groovy\n` (or
+  call the Groovy path directly) before compiling.
+- `$$...$$` dollar-quoted literals are lexed as plain string tokens, so
+  `EXECUTE GROOVY $$...$$` needs only `readString()`.
+- Groovy loaded via reflection in `SourceCompiler.GroovyCompiler`; missing jar
+  surfaces as stored `INIT_FAIL_EXCEPTION` ("Compile fail: no Groovy jar in
+  the classpath").
 
 ### Tests
 

@@ -14,14 +14,15 @@
 ## Status
 
 Current phase: 0 (bootstrap)
-Next task: 0.2 source recon
+Next task: 0.3 baseline test
 
 ## Log
 
 | Date (UTC) | Task | Result | Commit |
 |---|---|---|---|
 | 2026-07-10 | setup | Fork created from version-2.2.224, planning docs added | (this commit) |
-| 2026-07-10 | 0.1 | Build green: `./mvnw -DskipTests package` exit 0, `h2/target/h2-2.2.224.jar` produced, Temurin 17.0.12 | (this commit) |
+| 2026-07-10 | 0.1 | Build green: `./mvnw -DskipTests package` exit 0, `h2/target/h2-2.2.224.jar` produced, Temurin 17.0.12 | ca110285c |
+| 2026-07-10 | 0.2 | Recon: DESIGN touched-code table corrected (TableLinkConnection in org.h2.table; AUTOCOMMIT OFF already parsed per ADR-10; EXECUTE branch Parser.java:695; SourceCompiler needs //groovy prefix) | (this commit) |
 
 ## Open issues / parked
 
