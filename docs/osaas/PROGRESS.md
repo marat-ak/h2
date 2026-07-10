@@ -14,13 +14,14 @@
 ## Status
 
 Current phase: 0 (bootstrap)
-Next task: 0.1 build green
+Next task: 0.2 source recon
 
 ## Log
 
 | Date (UTC) | Task | Result | Commit |
 |---|---|---|---|
 | 2026-07-10 | setup | Fork created from version-2.2.224, planning docs added | (this commit) |
+| 2026-07-10 | 0.1 | Build green: `./mvnw -DskipTests package` exit 0, `h2/target/h2-2.2.224.jar` produced, Temurin 17.0.12 | (this commit) |
 
 ## Open issues / parked
 
