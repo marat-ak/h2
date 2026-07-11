@@ -45,14 +45,61 @@ public class TestLinkedTableTransactional extends TestDb {
         testBatchAccumulation();
         testBatchOrderingMixedShapes();
         testBatchDdlAndValidation();
+        testBatchStatementEndFlushAndDefault();
     }
 
     /**
-     * DESIGN.md Feature-1 test #3 (PLAN 2.1): with BATCH 5, 12 single-row
-     * inserts produce ceil(12/5)=3 executeBatch round-trips (2 on size, 1 on
-     * the flush triggered by a read); rows appear remotely only after commit;
-     * the local session sees its own batched rows (read-your-writes,
-     * DESIGN test #4).
+     * PLAN 2.2: a multi-row DML statement flushes its batch at statement end
+     * (correct update counts, ADR-4) even when the batch size is not reached;
+     * SET LINKED_TABLE_BATCH_SIZE provides the default BATCH for new
+     * transactional tables.
+     */
+    private void testBatchStatementEndFlushAndDefault() throws SQLException {
+        try (Connection remoteKeep = DriverManager.getConnection("jdbc:h2:mem:ltRemoteFlush")) {
+            Statement remoteStat = remoteKeep.createStatement();
+            remoteStat.execute("CREATE TABLE TEST(ID INT PRIMARY KEY, NAME VARCHAR)");
+            try (Connection local = DriverManager.getConnection("jdbc:h2:mem:ltLocalFlush")) {
+                Statement stat = local.createStatement();
+                // default batch size via SET
+                stat.execute("SET LINKED_TABLE_BATCH_SIZE 50");
+                stat.execute("CREATE LINKED TABLE LT('', 'jdbc:h2:mem:ltRemoteFlush', '', '', 'TEST') " +
+                        "AUTOCOMMIT OFF");
+                assertTrue(getLinkedTableSql(stat).contains("AUTOCOMMIT OFF BATCH 50"));
+                local.setAutoCommit(false);
+                long before = TableLinkTransaction.EXECUTE_BATCH_CALLS.get();
+                // 3 rows in one statement, far below the batch size of 50
+                int count = stat.executeUpdate("INSERT INTO LT VALUES(1, 'a'), (2, 'b'), (3, 'c')");
+                assertEquals(3, count);
+                // statement end flushed the batch exactly once
+                assertEquals(1, (int) (TableLinkTransaction.EXECUTE_BATCH_CALLS.get() - before));
+                // still not committed remotely
+                assertEquals(0, countRemote(remoteStat, "TEST"));
+                local.commit();
+                assertEquals(3, countRemote(remoteStat, "TEST"));
+                local.setAutoCommit(true);
+                stat.execute("DROP TABLE LT");
+                // explicit BATCH overrides the SET default
+                stat.execute("CREATE LINKED TABLE LT('', 'jdbc:h2:mem:ltRemoteFlush', '', '', 'TEST') " +
+                        "AUTOCOMMIT OFF BATCH 7");
+                assertTrue(getLinkedTableSql(stat).contains("BATCH 7"));
+                stat.execute("DROP TABLE LT");
+                // SET 0 disables batching for new tables
+                stat.execute("SET LINKED_TABLE_BATCH_SIZE 0");
+                stat.execute("CREATE LINKED TABLE LT('', 'jdbc:h2:mem:ltRemoteFlush', '', '', 'TEST') " +
+                        "AUTOCOMMIT OFF");
+                String sql = getLinkedTableSql(stat);
+                assertTrue(sql, !sql.contains("BATCH"));
+                stat.execute("DROP TABLE LT");
+            }
+            remoteStat.execute("DROP TABLE TEST");
+        }
+    }
+
+    /**
+     * DESIGN.md Feature-1 test #3 (PLAN 2.1/2.2): one 12-row INSERT with
+     * BATCH 5 produces ceil(12/5)=3 executeBatch round-trips (2 on size, 1 at
+     * statement end); rows appear remotely only after commit; the local
+     * session sees its own batched rows (read-your-writes, DESIGN test #4).
      */
     private void testBatchAccumulation() throws SQLException {
         try (Connection remoteKeep = DriverManager.getConnection("jdbc:h2:mem:ltRemoteBatch")) {
@@ -64,18 +111,20 @@ public class TestLinkedTableTransactional extends TestDb {
                         "AUTOCOMMIT OFF BATCH 5");
                 local.setAutoCommit(false);
                 long before = TableLinkTransaction.EXECUTE_BATCH_CALLS.get();
-                for (int i = 1; i <= 12; i++) {
-                    stat.execute("INSERT INTO LT VALUES(" + i + ", 'n" + i + "')");
-                }
-                // two full batches of 5 flushed on size
-                assertEquals(2, (int) (TableLinkTransaction.EXECUTE_BATCH_CALLS.get() - before));
+                // 12 rows in ONE statement with BATCH 5:
+                // 2 flushes on size (5+5) + 1 at statement end (2 remaining)
+                int count = stat.executeUpdate(
+                        "INSERT INTO LT SELECT X, 'n' || X FROM SYSTEM_RANGE(1, 12)");
+                assertEquals(12, count);
+                assertEquals(3, (int) (TableLinkTransaction.EXECUTE_BATCH_CALLS.get() - before));
                 // nothing committed remotely yet
                 assertEquals(0, countRemote(remoteStat, "TEST"));
-                // read-your-writes: reading the table flushes the pending 2
+                // read-your-writes: the local session sees all 12 rows
                 try (ResultSet rs = stat.executeQuery("SELECT COUNT(*) FROM LT")) {
                     rs.next();
                     assertEquals(12, rs.getInt(1));
                 }
+                // the read did not need another flush
                 assertEquals(3, (int) (TableLinkTransaction.EXECUTE_BATCH_CALLS.get() - before));
                 assertEquals(0, countRemote(remoteStat, "TEST"));
                 local.commit();

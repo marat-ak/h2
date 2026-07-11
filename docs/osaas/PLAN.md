@@ -37,7 +37,7 @@ into one commit — resumability depends on commit granularity.
 
 - [x] 2.1 LinkedIndex batch accumulation (addBatch/executeBatch), statement
       reuse keyed by SQL shape, flush on shape change (ordering).
-- [ ] 2.2 Flush triggers: batch size, statement end, read of same table
+- [x] 2.2 Flush triggers: batch size, statement end, read of same table
       (read-your-writes), commit. `BATCH n` option + `SET
       LINKED_TABLE_BATCH_SIZE n` default.
 - [ ] 2.3 Error mapping: BatchUpdateException → DbException with remote

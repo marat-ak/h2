@@ -869,6 +869,14 @@ public final class SessionLocal extends Session implements TransactionStore.Roll
      * @param savepoint the savepoint to which should be rolled back
      */
     public void rollbackTo(Savepoint savepoint) {
+        // a statement-level rollback discards the pending (unflushed) batch
+        // of the failed statement; flushed rows are undone by the remote
+        // transaction rollback in rollback() (OSaaS fork, ADR-12)
+        if (linkedTransactions != null && !linkedTransactions.isEmpty()) {
+            for (TableLinkTransaction tx : new ArrayList<>(linkedTransactions)) {
+                tx.discardBatch();
+            }
+        }
         int index = savepoint == null ? 0 : savepoint.logIndex;
         if (hasTransaction()) {
             markUsedTablesAsUpdated();
@@ -1788,10 +1796,21 @@ public final class SessionLocal extends Session implements TransactionStore.Roll
      */
     public void endStatement() {
         setCurrentCommand(null);
+        // flush pending linked-table batches at statement end so that update
+        // counts and error reporting stay per-statement (OSaaS fork, ADR-4)
+        flushLinkedTransactions();
         if (hasTransaction()) {
             transaction.markStatementEnd();
         }
         startStatement = -1;
+    }
+
+    private void flushLinkedTransactions() {
+        if (linkedTransactions != null && !linkedTransactions.isEmpty()) {
+            for (TableLinkTransaction tx : new ArrayList<>(linkedTransactions)) {
+                tx.flush();
+            }
+        }
     }
 
     /**

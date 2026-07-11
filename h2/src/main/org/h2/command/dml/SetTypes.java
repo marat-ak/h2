@@ -247,7 +247,12 @@ public class SetTypes {
      */
     public static final int LINKED_TABLE_TRANSACTIONAL = TRUNCATE_LARGE_LENGTH + 1;
 
-    private static final int COUNT = LINKED_TABLE_TRANSACTIONAL + 1;
+    /**
+     * The type of a SET LINKED_TABLE_BATCH_SIZE statement (OSaaS fork).
+     */
+    public static final int LINKED_TABLE_BATCH_SIZE = LINKED_TABLE_TRANSACTIONAL + 1;
+
+    private static final int COUNT = LINKED_TABLE_BATCH_SIZE + 1;
 
     private static final ArrayList<String> TYPES;
 
@@ -304,6 +309,7 @@ public class SetTypes {
         list.add("DEFAULT_NULL_ORDERING");
         list.add("TRUNCATE_LARGE_LENGTH");
         list.add("LINKED_TABLE_TRANSACTIONAL");
+        list.add("LINKED_TABLE_BATCH_SIZE");
         TYPES = list;
         assert(list.size() == COUNT);
     }

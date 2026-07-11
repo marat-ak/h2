@@ -387,6 +387,18 @@ public class Set extends Prepared {
             }
             break;
         }
+        case SetTypes.LINKED_TABLE_BATCH_SIZE: {
+            session.getUser().checkAdmin();
+            int value = getIntValue();
+            if (value < 0) {
+                throw DbException.getInvalidValueException("LINKED_TABLE_BATCH_SIZE", value);
+            }
+            synchronized (database) {
+                database.setLinkedTableBatchSize(value);
+                addOrUpdateSetting(name, null, value);
+            }
+            break;
+        }
         case SetTypes.QUERY_STATISTICS: {
             session.getUser().checkAdmin();
             int value = getIntValue();
