@@ -13,8 +13,8 @@
 
 ## Status
 
-Current phase: 1 (transactional linked tables)
-Next task: 1.5 Phase-1 test gate
+Current phase: 2 (batched DML)
+Next task: 2.1 LinkedIndex batch accumulation
 
 How to run a single H2 test class (no surefire):
 `cd h2 && ./mvnw -q test-compile && ./mvnw -q dependency:build-classpath -Dmdep.outputFile=target/cp.txt`
@@ -33,7 +33,8 @@ then `java -cp "target/classes;target/test-classes;$(cat target/cp.txt)" org.h2.
 | 2026-07-10 | 1.1 | AUTOCOMMIT OFF DDL round-trip verified by new test (SCRIPT output + file-db reopen through meta SQL; default/ON emit no AUTOCOMMIT clause). No product code change needed (ADR-10). TestLinkedTableTransactional green. | 92cea0448 |
 | 2026-07-10 | 1.2 | New TableLinkTransaction: per-session non-shared remote conn, real autoCommit=false; TableLink.execute/reusePreparedStatement route via it; SessionLocal register/remove plumbing; connect() no longer calls no-op setAutoCommit. Test flipped: mid-tx + post-rollback remote count now 0 (was 3); read-your-writes SELECT sees 3. TestLinkedTable green. | 8ba49c5be |
 | 2026-07-11 | 1.3 | SessionLocal hooks: commit(ddl) commits enlisted remotes first (ADR-3); rollback() rolls remotes back collecting errors so local rollback always completes; close() closes enlisted conns. Tests: commit propagation, conn reuse across txs, autocommit statement-end commit, session-close rollback+cleanup. TestLinkedTable + TestTransaction green. | d50929fba |
-| 2026-07-11 | 1.4 | SET LINKED_TABLE_TRANSACTIONAL TRUE|FALSE (SetTypes+Set, admin, persisted) drives CreateLinkedTable default when no AUTOCOMMIT option; URL param executes as SET at session open (ADR-11 — DbSettings+SetTypes double registration is dead in both paths). Tests: SET/URL default, explicit ON override, FALSE reset. TestLinkedTable green. | (this commit) |
+| 2026-07-11 | 1.4 | SET LINKED_TABLE_TRANSACTIONAL TRUE|FALSE (SetTypes+Set, admin, persisted) drives CreateLinkedTable default when no AUTOCOMMIT option; URL param executes as SET at session open (ADR-11 — DbSettings+SetTypes double registration is dead in both paths). Tests: SET/URL default, explicit ON override, FALSE reset. TestLinkedTable green. | 4c30dda66 |
+| 2026-07-11 | 1.5 | Phase-1 gate green: DESIGN #2 (visibility/rollback, tasks 1.2-1.3 tests), new #6 error-path test (duplicate PK -> SQLException, tx stays open, rollback works, conn reusable), #7 TestLinkedTable + TestTransaction green. | (this commit) |
 
 ## Open issues / parked
 

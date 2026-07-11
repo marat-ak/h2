@@ -40,6 +40,44 @@ public class TestLinkedTableTransactional extends TestDb {
         testAutoCommitOffCommitPropagation();
         testAutoCommitOffSessionClose();
         testLinkedTableTransactionalDefault();
+        testAutoCommitOffErrorPath();
+    }
+
+    /**
+     * DESIGN.md Feature-1 test #6 (PLAN 1.5): a remote constraint violation
+     * surfaces as an SQLException, the transaction stays open (rollback still
+     * works), and the enlisted connection remains usable afterwards.
+     */
+    private void testAutoCommitOffErrorPath() throws SQLException {
+        try (Connection remoteKeep = DriverManager.getConnection("jdbc:h2:mem:ltRemoteErr")) {
+            Statement remoteStat = remoteKeep.createStatement();
+            remoteStat.execute("CREATE TABLE TEST(ID INT PRIMARY KEY)");
+            try (Connection local = DriverManager.getConnection("jdbc:h2:mem:ltLocalErr")) {
+                Statement stat = local.createStatement();
+                stat.execute("CREATE LINKED TABLE LT('', 'jdbc:h2:mem:ltRemoteErr', '', '', 'TEST') " +
+                        "AUTOCOMMIT OFF");
+                local.setAutoCommit(false);
+                stat.execute("INSERT INTO LT VALUES(1)");
+                // duplicate key on the remote side surfaces as SQLException
+                assertThrows(SQLException.class, () -> stat.execute("INSERT INTO LT VALUES(1)"));
+                // the transaction is still open and the connection usable
+                stat.execute("INSERT INTO LT VALUES(2)");
+                local.commit();
+                assertEquals(2, countRemote(remoteStat, "TEST"));
+                // rollback after an error also works
+                stat.execute("INSERT INTO LT VALUES(3)");
+                assertThrows(SQLException.class, () -> stat.execute("INSERT INTO LT VALUES(3)"));
+                local.rollback();
+                assertEquals(2, countRemote(remoteStat, "TEST"));
+                // and the connection is still usable for the next transaction
+                stat.execute("INSERT INTO LT VALUES(4)");
+                local.commit();
+                assertEquals(3, countRemote(remoteStat, "TEST"));
+                local.setAutoCommit(true);
+                stat.execute("DROP TABLE LT");
+            }
+            remoteStat.execute("DROP TABLE TEST");
+        }
     }
 
     /**
