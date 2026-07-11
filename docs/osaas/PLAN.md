@@ -42,7 +42,7 @@ into one commit — resumability depends on commit granularity.
       LINKED_TABLE_BATCH_SIZE n` default.
 - [x] 2.3 Error mapping: BatchUpdateException → DbException with remote
       message; connection usable after failure.
-- [ ] 2.4 Tests: DESIGN Tests #3, #4, #5 green; update counts verified.
+- [x] 2.4 Tests: DESIGN Tests #3, #4, #5 green; update counts verified.
 
 ## Phase 3 — Groovy blocks
 
