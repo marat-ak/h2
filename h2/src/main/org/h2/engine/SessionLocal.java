@@ -50,6 +50,7 @@ import org.h2.store.DataHandler;
 import org.h2.store.InDoubtTransaction;
 import org.h2.store.LobStorageFrontend;
 import org.h2.table.Table;
+import org.h2.table.TableLinkTransaction;
 import org.h2.util.DateTimeUtils;
 import org.h2.util.HasSQL;
 import org.h2.util.NetworkConnectionInfo;
@@ -169,6 +170,13 @@ public final class SessionLocal extends Session implements TransactionStore.Roll
     private HashMap<String, ValueLob> removeLobMap;
     private int systemIdentifier;
     private HashMap<String, Procedure> procedures;
+
+    /**
+     * Transactional (AUTOCOMMIT OFF) linked-table connections enlisted in this
+     * session's transaction (OSaaS fork, ADR-10). Entries live until the
+     * session is closed; commit/rollback is propagated to each of them.
+     */
+    private ArrayList<TableLinkTransaction> linkedTransactions;
     private boolean autoCommitAtTransactionEnd;
     private String currentTransactionName;
     private volatile long cancelAtNs;
@@ -911,6 +919,31 @@ public final class SessionLocal extends Session implements TransactionStore.Roll
                 database = null;
                 user = null;
             }
+        }
+    }
+
+    /**
+     * Enlist a transactional linked-table connection in this session, so that
+     * local commit/rollback are propagated to the remote transaction and the
+     * connection is closed with the session (OSaaS fork, ADR-10).
+     *
+     * @param tx the per-session linked-table transaction
+     */
+    public void registerLinkedTransaction(TableLinkTransaction tx) {
+        if (linkedTransactions == null) {
+            linkedTransactions = Utils.newSmallArrayList();
+        }
+        linkedTransactions.add(tx);
+    }
+
+    /**
+     * Remove a closed linked-table transaction from this session.
+     *
+     * @param tx the per-session linked-table transaction
+     */
+    public void removeLinkedTransaction(TableLinkTransaction tx) {
+        if (linkedTransactions != null) {
+            linkedTransactions.remove(tx);
         }
     }
 

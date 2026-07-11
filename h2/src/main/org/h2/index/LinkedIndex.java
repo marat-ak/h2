@@ -228,7 +228,7 @@ public class LinkedIndex extends Index {
         try {
             PreparedStatement prep = link.execute(sql, params, false, session);
             int count = prep.executeUpdate();
-            link.reusePreparedStatement(prep, sql);
+            link.reusePreparedStatement(prep, sql, session);
             rowCount -= count;
         } catch (Exception e) {
             throw TableLink.wrapException(sql, e);

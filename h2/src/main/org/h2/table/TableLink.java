@@ -70,6 +70,13 @@ public class TableLink extends Table {
     private int fetchSize = 0;
     private boolean autocommit =true;
 
+    /**
+     * Per-session transactional state for AUTOCOMMIT OFF tables: each session
+     * gets its own non-shared remote connection with real autoCommit=false
+     * (OSaaS fork, ADR-8/ADR-10).
+     */
+    private final HashMap<SessionLocal, TableLinkTransaction> transactions = new HashMap<>();
+
     public TableLink(Schema schema, int id, String name, String driver,
             String url, String user, String password, String originalSchema,
             String originalTable, boolean emitUpdates, boolean force) {
@@ -100,7 +107,10 @@ public class TableLink extends Table {
         for (int retry = 0;; retry++) {
             try {
                 conn = database.getLinkConnection(driver, url, user, password);
-                conn.setAutoCommit(autocommit);
+                // For AUTOCOMMIT OFF tables the base (possibly shared)
+                // connection is only used for metadata and non-session work;
+                // sessions get dedicated connections with real
+                // autoCommit=false via getTransaction() (OSaaS fork, ADR-10).
                 synchronized (conn) {
                     try {
                         readMetaData();
@@ -461,6 +471,7 @@ public class TableLink extends Table {
 
     @Override
     public void close(SessionLocal session) {
+        closeTransactions();
         if (conn != null) {
             try {
                 conn.close(false);
@@ -480,7 +491,7 @@ public class TableLink extends Table {
             rs.next();
             long count = rs.getLong(1);
             rs.close();
-            reusePreparedStatement(prep, sql);
+            reusePreparedStatement(prep, sql, session);
             return count;
         } catch (Exception e) {
             throw wrapException(sql, e);
@@ -519,6 +530,11 @@ public class TableLink extends Table {
         if (conn == null) {
             throw connectException;
         }
+        if (!autocommit && session != null) {
+            // transactional table: run on the session's dedicated remote
+            // connection (OSaaS fork, ADR-10)
+            return getTransaction(session).execute(sql, params, reusePrepared);
+        }
         for (int retry = 0;; retry++) {
             try {
                 synchronized (conn) {
@@ -529,23 +545,7 @@ public class TableLink extends Table {
                             prep.setFetchSize(fetchSize);
                         }
                     }
-                    if (trace.isDebugEnabled()) {
-                        StringBuilder builder = new StringBuilder(getName()).append(":\n").append(sql);
-                        if (params != null && !params.isEmpty()) {
-                            builder.append(" {");
-                            for (int i = 0, l = params.size(); i < l;) {
-                                Value v = params.get(i);
-                                if (i > 0) {
-                                    builder.append(", ");
-                                }
-                                builder.append(++i).append(": ");
-                                v.getSQL(builder, DEFAULT_SQL_FLAGS);
-                            }
-                            builder.append('}');
-                        }
-                        builder.append(';');
-                        trace.debug(builder.toString());
-                    }
+                    traceExecute(sql, params);
                     if (params != null) {
                         JdbcConnection ownConnection = session.createConnection(false);
                         for (int i = 0, size = params.size(); i < size; i++) {
@@ -555,7 +555,8 @@ public class TableLink extends Table {
                     }
                     prep.execute();
                     if (reusePrepared) {
-                        reusePreparedStatement(prep, sql);
+                        // non-transactional path: cache on the base connection
+                        preparedMap.put(sql, prep);
                         return null;
                     }
                     return prep;
@@ -567,6 +568,84 @@ public class TableLink extends Table {
                 conn.close(true);
                 connect();
             }
+        }
+    }
+
+    /**
+     * Write the statement and its parameters to the trace if debug tracing is
+     * enabled.
+     *
+     * @param sql the SQL statement
+     * @param params the parameters or null
+     */
+    void traceExecute(String sql, ArrayList<Value> params) {
+        if (trace.isDebugEnabled()) {
+            StringBuilder builder = new StringBuilder(getName()).append(":\n").append(sql);
+            if (params != null && !params.isEmpty()) {
+                builder.append(" {");
+                for (int i = 0, l = params.size(); i < l;) {
+                    Value v = params.get(i);
+                    if (i > 0) {
+                        builder.append(", ");
+                    }
+                    builder.append(++i).append(": ");
+                    v.getSQL(builder, DEFAULT_SQL_FLAGS);
+                }
+                builder.append('}');
+            }
+            builder.append(';');
+            trace.debug(builder.toString());
+        }
+    }
+
+    /**
+     * Get (or create) the transactional per-session state of this AUTOCOMMIT
+     * OFF linked table. The first call for a session opens a dedicated,
+     * non-shared remote connection with autoCommit=false and enlists it with
+     * the session, so that local commit/rollback drive the remote transaction
+     * (OSaaS fork, ADR-8/ADR-10).
+     *
+     * @param session the session
+     * @return the per-session transactional state
+     */
+    public TableLinkTransaction getTransaction(SessionLocal session) {
+        synchronized (transactions) {
+            TableLinkTransaction tx = transactions.get(session);
+            if (tx == null) {
+                TableLinkConnection c = TableLinkConnection.open(new HashMap<>(),
+                        driver, url, user, password, false);
+                try {
+                    c.getConnection().setAutoCommit(false);
+                } catch (SQLException e) {
+                    c.close(true);
+                    throw DbException.convert(e);
+                }
+                tx = new TableLinkTransaction(this, session, c);
+                transactions.put(session, tx);
+                session.registerLinkedTransaction(tx);
+            }
+            return tx;
+        }
+    }
+
+    /**
+     * Remove the per-session transactional state (called when it is closed).
+     *
+     * @param session the owning session
+     */
+    void removeTransaction(SessionLocal session) {
+        synchronized (transactions) {
+            transactions.remove(session);
+        }
+    }
+
+    private void closeTransactions() {
+        ArrayList<TableLinkTransaction> list;
+        synchronized (transactions) {
+            list = new ArrayList<>(transactions.values());
+        }
+        for (TableLinkTransaction tx : list) {
+            tx.close();
         }
     }
 
@@ -656,12 +735,20 @@ public class TableLink extends Table {
     }
 
     /**
-     * Add this prepared statement to the list of cached statements.
+     * Add this prepared statement to the list of cached statements. For
+     * transactional (AUTOCOMMIT OFF) tables the statement belongs to the
+     * session's dedicated connection and is returned to that session's cache
+     * instead (OSaaS fork, ADR-10).
      *
      * @param prep the prepared statement
      * @param sql the SQL statement
+     * @param session the session the statement was executed for
      */
-    public void reusePreparedStatement(PreparedStatement prep, String sql) {
+    public void reusePreparedStatement(PreparedStatement prep, String sql, SessionLocal session) {
+        if (!autocommit && session != null) {
+            getTransaction(session).reusePreparedStatement(prep, sql);
+            return;
+        }
         synchronized (conn) {
             preparedMap.put(sql, prep);
         }

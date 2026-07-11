@@ -98,18 +98,15 @@ public class TestLinkedTableTransactional extends TestDb {
     /**
      * DESIGN.md Feature-1 test #1/#2 (ADR-10).
      *
-     * Baseline (upstream 2.2.224): AUTOCOMMIT OFF is parsed but is a no-op.
-     * Rows inserted into a linked table inside an open local transaction are
-     * committed remotely per row - they are visible to an independent remote
-     * connection before the local commit, and a local rollback does not
-     * remove them.
+     * Upstream 2.2.224 baseline (task 0.3): AUTOCOMMIT OFF was a no-op - all
+     * 3 rows were committed remotely per row (visible mid-transaction) and
+     * survived a local rollback.
      *
-     * Target (Phase 1): with AUTOCOMMIT OFF the remote connection is enlisted
-     * in the local transaction - nothing is visible remotely until local
-     * commit, and local rollback removes all remote effects.
-     *
-     * This method asserts the CURRENT baseline behavior; Phase 1 flips the
-     * expectations marked with "FLIP".
+     * Since task 1.2 the table uses a dedicated per-session remote connection
+     * with real autoCommit=false: nothing is visible to an independent remote
+     * connection until local commit, and rows inserted in a rolled-back local
+     * transaction never appear remotely. Task 1.3 adds commit propagation
+     * (see testAutoCommitOffCommitPropagation).
      */
     private void testAutoCommitOffTransactional() throws SQLException {
         // keeps the named in-memory database alive for the whole test
@@ -124,14 +121,18 @@ public class TestLinkedTableTransactional extends TestDb {
                 stat.execute("INSERT INTO LT VALUES(1, 'a')");
                 stat.execute("INSERT INTO LT VALUES(2, 'b')");
                 stat.execute("INSERT INTO LT VALUES(3, 'c')");
-                // independent remote connection: how many rows are already
-                // committed remotely while the local tx is still open?
-                // FLIP in Phase 1: expected becomes 0
-                assertEquals(3, countRemote(remoteStat));
+                // read-your-writes: the local session sees its own
+                // uncommitted rows through the linked table
+                try (ResultSet rs = stat.executeQuery("SELECT COUNT(*) FROM LT")) {
+                    rs.next();
+                    assertEquals(3, rs.getInt(1));
+                }
+                // independent remote connection: nothing committed remotely
+                // while the local tx is still open (was 3 upstream)
+                assertEquals(0, countRemote(remoteStat));
                 local.rollback();
-                // local rollback must remove remote rows once transactional
-                // FLIP in Phase 1: expected becomes 0
-                assertEquals(3, countRemote(remoteStat));
+                // local rollback leaves no remote effects (was 3 upstream)
+                assertEquals(0, countRemote(remoteStat));
                 local.setAutoCommit(true);
                 stat.execute("DROP TABLE LT");
             }

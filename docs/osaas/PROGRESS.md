@@ -14,7 +14,7 @@
 ## Status
 
 Current phase: 1 (transactional linked tables)
-Next task: 1.2 per-session non-shared transactional connection
+Next task: 1.3 SessionLocal commit/rollback/close hooks
 
 How to run a single H2 test class (no surefire):
 `cd h2 && ./mvnw -q test-compile && ./mvnw -q dependency:build-classpath -Dmdep.outputFile=target/cp.txt`
@@ -30,7 +30,8 @@ then `java -cp "target/classes;target/test-classes;$(cat target/cp.txt)" org.h2.
 | 2026-07-10 | 0.2 | Recon: DESIGN touched-code table corrected (TableLinkConnection in org.h2.table; AUTOCOMMIT OFF already parsed per ADR-10; EXECUTE branch Parser.java:695; SourceCompiler needs //groovy prefix) | cd02cd5a4 |
 | 2026-07-10 | 0.3 | Baseline test TestLinkedTableTransactional green: AUTOCOMMIT OFF is a no-op upstream — 3 rows visible remotely mid-tx and after local rollback (expectations marked FLIP for Phase 1). Registered in TestAll. | 162d2a1bf |
 | 2026-07-10 | 0.4 | Upstream org.h2.test.db.TestLinkedTable baseline: GREEN (default config, class main runner) | 64793e204 |
-| 2026-07-10 | 1.1 | AUTOCOMMIT OFF DDL round-trip verified by new test (SCRIPT output + file-db reopen through meta SQL; default/ON emit no AUTOCOMMIT clause). No product code change needed (ADR-10). TestLinkedTableTransactional green. | (this commit) |
+| 2026-07-10 | 1.1 | AUTOCOMMIT OFF DDL round-trip verified by new test (SCRIPT output + file-db reopen through meta SQL; default/ON emit no AUTOCOMMIT clause). No product code change needed (ADR-10). TestLinkedTableTransactional green. | 92cea0448 |
+| 2026-07-10 | 1.2 | New TableLinkTransaction: per-session non-shared remote conn, real autoCommit=false; TableLink.execute/reusePreparedStatement route via it; SessionLocal register/remove plumbing; connect() no longer calls no-op setAutoCommit. Test flipped: mid-tx + post-rollback remote count now 0 (was 3); read-your-writes SELECT sees 3. TestLinkedTable green. | (this commit) |
 
 ## Open issues / parked
 

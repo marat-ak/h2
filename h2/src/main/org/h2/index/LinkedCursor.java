@@ -52,7 +52,7 @@ public class LinkedCursor implements Cursor {
             boolean result = rs.next();
             if (!result) {
                 rs.close();
-                tableLink.reusePreparedStatement(prep, sql);
+                tableLink.reusePreparedStatement(prep, sql, session);
                 current = null;
                 return false;
             }
