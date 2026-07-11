@@ -26,7 +26,7 @@ into one commit — resumability depends on commit granularity.
       round-trips it — task delivered as verification + DDL round-trip test.)
 - [x] 1.2 Per-session non-shared remote connection with autoCommit=false for
       transactional tables (bypass shareLinkedConnections, ADR-8).
-- [ ] 1.3 SessionLocal enlistment: commit → flush → remote commit → local
+- [x] 1.3 SessionLocal enlistment: commit → flush → remote commit → local
       commit; rollback → discard → remote rollback. Close/cleanup on session
       close, including error paths.
 - [ ] 1.4 Global default `SET LINKED_TABLE_TRANSACTIONAL TRUE` + URL setting.

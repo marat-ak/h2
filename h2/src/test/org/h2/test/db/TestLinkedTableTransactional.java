@@ -37,6 +37,79 @@ public class TestLinkedTableTransactional extends TestDb {
     public void test() throws SQLException {
         testAutoCommitOffDdlRoundTrip();
         testAutoCommitOffTransactional();
+        testAutoCommitOffCommitPropagation();
+        testAutoCommitOffSessionClose();
+    }
+
+    /**
+     * PLAN 1.3: local commit propagates to the remote transaction
+     * (flush - remote commit - local commit, ADR-3); after a commit the same
+     * enlisted connection keeps working for the next transaction; local
+     * autocommit sessions commit remotely at statement end.
+     */
+    private void testAutoCommitOffCommitPropagation() throws SQLException {
+        try (Connection remoteKeep = DriverManager.getConnection("jdbc:h2:mem:ltRemoteCommit")) {
+            Statement remoteStat = remoteKeep.createStatement();
+            remoteStat.execute("CREATE TABLE TEST(ID INT PRIMARY KEY, NAME VARCHAR)");
+            try (Connection local = DriverManager.getConnection("jdbc:h2:mem:ltLocalCommit")) {
+                Statement stat = local.createStatement();
+                stat.execute("CREATE LINKED TABLE LT('', 'jdbc:h2:mem:ltRemoteCommit', '', '', 'TEST') " +
+                        "AUTOCOMMIT OFF");
+                local.setAutoCommit(false);
+                stat.execute("INSERT INTO LT VALUES(1, 'a')");
+                stat.execute("INSERT INTO LT VALUES(2, 'b')");
+                assertEquals(0, countRemote(remoteStat, "TEST"));
+                local.commit();
+                assertEquals(2, countRemote(remoteStat, "TEST"));
+                // the enlisted connection survives the commit: next tx works
+                stat.execute("INSERT INTO LT VALUES(3, 'c')");
+                assertEquals(2, countRemote(remoteStat, "TEST"));
+                local.rollback();
+                assertEquals(2, countRemote(remoteStat, "TEST"));
+                // local autocommit: remote commit at statement end
+                local.setAutoCommit(true);
+                stat.execute("INSERT INTO LT VALUES(4, 'd')");
+                assertEquals(3, countRemote(remoteStat, "TEST"));
+                stat.execute("DROP TABLE LT");
+            }
+            remoteStat.execute("DROP TABLE TEST");
+        }
+    }
+
+    /**
+     * PLAN 1.3: closing the local session with an open transaction rolls the
+     * remote transaction back and closes the remote connection.
+     */
+    private void testAutoCommitOffSessionClose() throws SQLException {
+        try (Connection remoteKeep = DriverManager.getConnection("jdbc:h2:mem:ltRemoteClose")) {
+            Statement remoteStat = remoteKeep.createStatement();
+            remoteStat.execute("CREATE TABLE TEST(ID INT PRIMARY KEY)");
+            Connection local = DriverManager.getConnection(
+                    "jdbc:h2:mem:ltLocalClose;DB_CLOSE_DELAY=-1");
+            try {
+                Statement stat = local.createStatement();
+                stat.execute("CREATE LINKED TABLE LT('', 'jdbc:h2:mem:ltRemoteClose', '', '', 'TEST') " +
+                        "AUTOCOMMIT OFF");
+                local.setAutoCommit(false);
+                stat.execute("INSERT INTO LT VALUES(1)");
+                // session closes with the transaction open
+                local.close();
+                assertEquals(0, countRemote(remoteStat, "TEST"));
+                // a new session on the same database gets a fresh connection
+                local = DriverManager.getConnection("jdbc:h2:mem:ltLocalClose;DB_CLOSE_DELAY=-1");
+                stat = local.createStatement();
+                stat.execute("INSERT INTO LT VALUES(2)");
+                assertEquals(1, countRemote(remoteStat, "TEST"));
+                stat.execute("DROP TABLE LT");
+            } finally {
+                try (Statement shutdown = local.createStatement()) {
+                    shutdown.execute("SHUTDOWN");
+                } catch (SQLException e) {
+                    // already closed
+                }
+            }
+            remoteStat.execute("DROP TABLE TEST");
+        }
     }
 
     /**
@@ -141,7 +214,11 @@ public class TestLinkedTableTransactional extends TestDb {
     }
 
     private static int countRemote(Statement remoteStat) throws SQLException {
-        try (ResultSet rs = remoteStat.executeQuery("SELECT COUNT(*) FROM TEST")) {
+        return countRemote(remoteStat, "TEST");
+    }
+
+    private static int countRemote(Statement remoteStat, String table) throws SQLException {
+        try (ResultSet rs = remoteStat.executeQuery("SELECT COUNT(*) FROM " + table)) {
             rs.next();
             return rs.getInt(1);
         }

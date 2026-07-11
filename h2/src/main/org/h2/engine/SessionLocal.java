@@ -685,6 +685,10 @@ public final class SessionLocal extends Session implements TransactionStore.Roll
      */
     public void commit(boolean ddl) {
         beforeCommitOrRollback();
+        // flush and commit enlisted linked-table transactions first
+        // (remote-first ordering, OSaaS fork ADR-3): a failure here leaves
+        // the local transaction open so the user can still roll back
+        commitLinkedTransactions();
         if (hasTransaction()) {
             try {
                 markUsedTablesAsUpdated();
@@ -804,6 +808,10 @@ public final class SessionLocal extends Session implements TransactionStore.Roll
      */
     public void rollback() {
         beforeCommitOrRollback();
+        // discard pending work and roll back enlisted linked-table
+        // transactions (OSaaS fork ADR-10); errors are collected so that the
+        // local rollback always completes, and rethrown afterwards
+        DbException linkedError = rollbackLinkedTransactions();
         if (hasTransaction()) {
             rollbackTo(null);
         }
@@ -814,6 +822,45 @@ public final class SessionLocal extends Session implements TransactionStore.Roll
             autoCommitAtTransactionEnd = false;
         }
         endTransaction();
+        if (linkedError != null) {
+            throw linkedError;
+        }
+    }
+
+    private void commitLinkedTransactions() {
+        if (linkedTransactions != null && !linkedTransactions.isEmpty()) {
+            for (TableLinkTransaction tx : new ArrayList<>(linkedTransactions)) {
+                tx.commit();
+            }
+        }
+    }
+
+    private DbException rollbackLinkedTransactions() {
+        DbException error = null;
+        if (linkedTransactions != null && !linkedTransactions.isEmpty()) {
+            for (TableLinkTransaction tx : new ArrayList<>(linkedTransactions)) {
+                try {
+                    tx.rollback();
+                } catch (DbException e) {
+                    if (error == null) {
+                        error = e;
+                    }
+                    // connection state is unknown - drop it; the next use of
+                    // the table in this session opens a fresh connection
+                    tx.close();
+                }
+            }
+        }
+        return error;
+    }
+
+    private void closeLinkedTransactions() {
+        if (linkedTransactions != null) {
+            for (TableLinkTransaction tx : new ArrayList<>(linkedTransactions)) {
+                tx.close();
+            }
+            linkedTransactions = null;
+        }
     }
 
     /**
@@ -909,6 +956,9 @@ public final class SessionLocal extends Session implements TransactionStore.Roll
                     cleanTempTables(true);
                     commit(true);       // temp table removal may have opened new transaction
                 }
+                // close remote connections of transactional linked tables
+                // (OSaaS fork ADR-10)
+                closeLinkedTransactions();
 
                 // Table#removeChildrenAndResources can take the meta lock,
                 // and we need to unlock before we call removeSession(), which might
