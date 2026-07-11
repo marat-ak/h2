@@ -11,6 +11,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 
+import org.h2.table.TableLinkTransaction;
 import org.h2.test.TestBase;
 import org.h2.test.TestDb;
 
@@ -41,6 +42,119 @@ public class TestLinkedTableTransactional extends TestDb {
         testAutoCommitOffSessionClose();
         testLinkedTableTransactionalDefault();
         testAutoCommitOffErrorPath();
+        testBatchAccumulation();
+        testBatchOrderingMixedShapes();
+        testBatchDdlAndValidation();
+    }
+
+    /**
+     * DESIGN.md Feature-1 test #3 (PLAN 2.1): with BATCH 5, 12 single-row
+     * inserts produce ceil(12/5)=3 executeBatch round-trips (2 on size, 1 on
+     * the flush triggered by a read); rows appear remotely only after commit;
+     * the local session sees its own batched rows (read-your-writes,
+     * DESIGN test #4).
+     */
+    private void testBatchAccumulation() throws SQLException {
+        try (Connection remoteKeep = DriverManager.getConnection("jdbc:h2:mem:ltRemoteBatch")) {
+            Statement remoteStat = remoteKeep.createStatement();
+            remoteStat.execute("CREATE TABLE TEST(ID INT PRIMARY KEY, NAME VARCHAR)");
+            try (Connection local = DriverManager.getConnection("jdbc:h2:mem:ltLocalBatch")) {
+                Statement stat = local.createStatement();
+                stat.execute("CREATE LINKED TABLE LT('', 'jdbc:h2:mem:ltRemoteBatch', '', '', 'TEST') " +
+                        "AUTOCOMMIT OFF BATCH 5");
+                local.setAutoCommit(false);
+                long before = TableLinkTransaction.EXECUTE_BATCH_CALLS.get();
+                for (int i = 1; i <= 12; i++) {
+                    stat.execute("INSERT INTO LT VALUES(" + i + ", 'n" + i + "')");
+                }
+                // two full batches of 5 flushed on size
+                assertEquals(2, (int) (TableLinkTransaction.EXECUTE_BATCH_CALLS.get() - before));
+                // nothing committed remotely yet
+                assertEquals(0, countRemote(remoteStat, "TEST"));
+                // read-your-writes: reading the table flushes the pending 2
+                try (ResultSet rs = stat.executeQuery("SELECT COUNT(*) FROM LT")) {
+                    rs.next();
+                    assertEquals(12, rs.getInt(1));
+                }
+                assertEquals(3, (int) (TableLinkTransaction.EXECUTE_BATCH_CALLS.get() - before));
+                assertEquals(0, countRemote(remoteStat, "TEST"));
+                local.commit();
+                assertEquals(12, countRemote(remoteStat, "TEST"));
+                // rollback discards pending batched rows
+                stat.execute("INSERT INTO LT VALUES(100, 'x')");
+                local.rollback();
+                local.commit();
+                assertEquals(12, countRemote(remoteStat, "TEST"));
+                local.setAutoCommit(true);
+                stat.execute("DROP TABLE LT");
+            }
+            remoteStat.execute("DROP TABLE TEST");
+        }
+    }
+
+    /**
+     * DESIGN.md Feature-1 test #5 (PLAN 2.1): mixed-shape DML in one
+     * transaction keeps its order - a different SQL string flushes the
+     * pending batch first.
+     */
+    private void testBatchOrderingMixedShapes() throws SQLException {
+        try (Connection remoteKeep = DriverManager.getConnection("jdbc:h2:mem:ltRemoteOrder")) {
+            Statement remoteStat = remoteKeep.createStatement();
+            remoteStat.execute("CREATE TABLE TEST(ID INT PRIMARY KEY, NAME VARCHAR)");
+            try (Connection local = DriverManager.getConnection("jdbc:h2:mem:ltLocalOrder")) {
+                Statement stat = local.createStatement();
+                stat.execute("CREATE LINKED TABLE LT('', 'jdbc:h2:mem:ltRemoteOrder', '', '', 'TEST') " +
+                        "AUTOCOMMIT OFF BATCH 100");
+                local.setAutoCommit(false);
+                stat.execute("INSERT INTO LT VALUES(1, 'a')");
+                // UPDATE on a linked table runs as DELETE + INSERT: both are
+                // different shapes and must not overtake the first INSERT
+                stat.execute("UPDATE LT SET NAME='b' WHERE ID=1");
+                stat.execute("INSERT INTO LT VALUES(2, 'c')");
+                stat.execute("DELETE FROM LT WHERE ID=2");
+                stat.execute("INSERT INTO LT VALUES(3, 'd')");
+                local.commit();
+                try (ResultSet rs = remoteStat.executeQuery("SELECT ID, NAME FROM TEST ORDER BY ID")) {
+                    assertTrue(rs.next());
+                    assertEquals(1, rs.getInt(1));
+                    assertEquals("b", rs.getString(2));
+                    assertTrue(rs.next());
+                    assertEquals(3, rs.getInt(1));
+                    assertEquals("d", rs.getString(2));
+                    assertFalse(rs.next());
+                }
+                local.setAutoCommit(true);
+                stat.execute("DROP TABLE LT");
+            }
+            remoteStat.execute("DROP TABLE TEST");
+        }
+    }
+
+    /**
+     * PLAN 2.1: BATCH n round-trips through DDL; BATCH with an autocommit
+     * (non-transactional) table is rejected.
+     */
+    private void testBatchDdlAndValidation() throws SQLException {
+        try (Connection remoteKeep = DriverManager.getConnection("jdbc:h2:mem:ltRemoteBddl")) {
+            remoteKeep.createStatement().execute("CREATE TABLE TEST(ID INT)");
+            try (Connection local = DriverManager.getConnection("jdbc:h2:mem:ltLocalBddl")) {
+                Statement stat = local.createStatement();
+                stat.execute("CREATE LINKED TABLE LT('', 'jdbc:h2:mem:ltRemoteBddl', '', '', 'TEST') " +
+                        "AUTOCOMMIT OFF BATCH 500");
+                String sql = getLinkedTableSql(stat);
+                assertTrue(sql, sql.contains("AUTOCOMMIT OFF BATCH 500"));
+                stat.execute("DROP TABLE LT");
+                // BATCH without AUTOCOMMIT OFF is rejected
+                assertThrows(SQLException.class, () -> stat.execute(
+                        "CREATE LINKED TABLE LT('', 'jdbc:h2:mem:ltRemoteBddl', '', '', 'TEST') BATCH 500"));
+                // BATCH 1 and BATCH 0 mean "no batching" and are accepted
+                stat.execute("CREATE LINKED TABLE LT('', 'jdbc:h2:mem:ltRemoteBddl', '', '', 'TEST') " +
+                        "AUTOCOMMIT OFF BATCH 1");
+                sql = getLinkedTableSql(stat);
+                assertTrue(sql, !sql.contains("BATCH"));
+                stat.execute("DROP TABLE LT");
+            }
+        }
     }
 
     /**

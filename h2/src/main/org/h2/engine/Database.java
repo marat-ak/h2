@@ -192,6 +192,12 @@ public final class Database implements DataHandler, CastDataProvider {
      * open, because the name is registered in SetTypes.
      */
     private boolean linkedTableTransactional;
+    /**
+     * Default BATCH size for new transactional linked tables without an
+     * explicit BATCH option (OSaaS fork); values <= 1 disable batching.
+     * Set with SET LINKED_TABLE_BATCH_SIZE.
+     */
+    private int linkedTableBatchSize = 1;
     private Mode mode = Mode.getRegular();
     private DefaultNullOrdering defaultNullOrdering = DefaultNullOrdering.LOW;
     private int maxOperationMemory =
@@ -2053,6 +2059,26 @@ public final class Database implements DataHandler, CastDataProvider {
      */
     public boolean isLinkedTableTransactional() {
         return linkedTableTransactional;
+    }
+
+    /**
+     * Set the default BATCH size for new transactional linked tables
+     * (OSaaS fork).
+     *
+     * @param n the batch size; values <= 1 disable batching
+     */
+    public void setLinkedTableBatchSize(int n) {
+        linkedTableBatchSize = n;
+    }
+
+    /**
+     * The default BATCH size for new transactional linked tables
+     * (OSaaS fork).
+     *
+     * @return the batch size
+     */
+    public int getLinkedTableBatchSize() {
+        return linkedTableBatchSize;
     }
 
     public void setQueryStatistics(boolean b) {

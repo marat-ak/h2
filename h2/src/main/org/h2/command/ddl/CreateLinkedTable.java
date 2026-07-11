@@ -34,6 +34,12 @@ public class CreateLinkedTable extends SchemaCommand {
      * the database default LINKED_TABLE_TRANSACTIONAL applies (OSaaS fork).
      */
     private Boolean autocommit;
+    /**
+     * Explicit BATCH option, or null when not specified - the database
+     * default LINKED_TABLE_BATCH_SIZE then applies to transactional tables
+     * (OSaaS fork).
+     */
+    private Integer batchSize;
 
     public CreateLinkedTable(SessionLocal session, Schema schema) {
         super(session, schema);
@@ -85,6 +91,15 @@ public class CreateLinkedTable extends SchemaCommand {
         this.autocommit= mode;
     }
 
+    /**
+     * Set the DML batch size (BATCH option, OSaaS fork).
+     *
+     * @param batchSize the batch size
+     */
+    public void setBatchSize(int batchSize) {
+        this.batchSize = batchSize;
+    }
+
     @Override
     public long update() {
         session.getUser().checkAdmin();
@@ -106,7 +121,17 @@ public class CreateLinkedTable extends SchemaCommand {
         if (fetchSize > 0) {
             table.setFetchSize(fetchSize);
         }
-        table.setAutoCommit(autocommit != null ? autocommit : !db.isLinkedTableTransactional());
+        boolean resolvedAutocommit = autocommit != null ? autocommit : !db.isLinkedTableTransactional();
+        table.setAutoCommit(resolvedAutocommit);
+        if (batchSize != null) {
+            // explicit BATCH requires a transactional table (ADR-12)
+            if (resolvedAutocommit && batchSize > 1) {
+                throw DbException.getUnsupportedException("BATCH requires AUTOCOMMIT OFF");
+            }
+            table.setBatchSize(batchSize);
+        } else if (!resolvedAutocommit) {
+            table.setBatchSize(db.getLinkedTableBatchSize());
+        }
         if (temporary && !globalTemporary) {
             session.addLocalTempTable(table);
         } else {

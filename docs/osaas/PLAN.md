@@ -35,7 +35,7 @@ into one commit — resumability depends on commit granularity.
 
 ## Phase 2 — Batched DML
 
-- [ ] 2.1 LinkedIndex batch accumulation (addBatch/executeBatch), statement
+- [x] 2.1 LinkedIndex batch accumulation (addBatch/executeBatch), statement
       reuse keyed by SQL shape, flush on shape change (ordering).
 - [ ] 2.2 Flush triggers: batch size, statement end, read of same table
       (read-your-writes), commit. `BATCH n` option + `SET

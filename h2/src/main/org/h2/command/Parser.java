@@ -8912,6 +8912,9 @@ public final class Parser extends ParserBase {
                 command.setAutoCommit(false);
             }
         }
+        if (readIf("BATCH")) {
+            command.setBatchSize(readNonNegativeInt());
+        }
         return command;
     }
 

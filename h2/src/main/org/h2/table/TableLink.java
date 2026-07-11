@@ -69,6 +69,11 @@ public class TableLink extends Table {
     private final boolean targetsMySql;
     private int fetchSize = 0;
     private boolean autocommit =true;
+    /**
+     * DML batch size for transactional tables; values <= 1 disable batching
+     * (BATCH n option, OSaaS fork).
+     */
+    private int batchSize = 1;
 
     /**
      * Per-session transactional state for AUTOCOMMIT OFF tables: each session
@@ -431,6 +436,9 @@ public class TableLink extends Table {
         if(!autocommit) {
             buff.append(" AUTOCOMMIT OFF");
         }
+        if (batchSize > 1) {
+            buff.append(" BATCH ").append(batchSize);
+        }
         buff.append(" /*").append(DbException.HIDE_SQL).append("*/");
         return buff.toString();
     }
@@ -595,6 +603,33 @@ public class TableLink extends Table {
             }
             builder.append(';');
             trace.debug(builder.toString());
+        }
+    }
+
+    /**
+     * Whether DML on this table is batched for the given session:
+     * transactional (AUTOCOMMIT OFF) with BATCH size > 1.
+     *
+     * @param session the session
+     * @return true if DML should be batched
+     */
+    public boolean isBatchDml(SessionLocal session) {
+        return !autocommit && batchSize > 1 && session != null;
+    }
+
+    /**
+     * Execute a single-row DML statement, adding it to the session's pending
+     * batch when batching is enabled for this table (OSaaS fork).
+     *
+     * @param sql the DML statement
+     * @param params the parameters or null
+     * @param session the session
+     */
+    public void executeDml(String sql, ArrayList<Value> params, SessionLocal session) {
+        if (isBatchDml(session)) {
+            getTransaction(session).addBatch(sql, params);
+        } else {
+            execute(sql, params, true, session);
         }
     }
 
@@ -826,6 +861,24 @@ public class TableLink extends Table {
      */
     public int getFetchSize() {
         return fetchSize;
+    }
+
+    /**
+     * Set the DML batch size (values <= 1 disable batching).
+     *
+     * @param batchSize the batch size
+     */
+    public void setBatchSize(int batchSize) {
+        this.batchSize = batchSize;
+    }
+
+    /**
+     * The DML batch size; values <= 1 mean batching is disabled.
+     *
+     * @return the batch size
+     */
+    public int getBatchSize() {
+        return batchSize;
     }
 
     /**

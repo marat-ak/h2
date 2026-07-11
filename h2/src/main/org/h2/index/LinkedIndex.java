@@ -79,7 +79,7 @@ public class LinkedIndex extends Index {
         buff.append(')');
         String sql = buff.toString();
         try {
-            link.execute(sql, params, true, session);
+            link.executeDml(sql, params, session);
             rowCount++;
         } catch (Exception e) {
             throw TableLink.wrapException(sql, e);
@@ -226,10 +226,17 @@ public class LinkedIndex extends Index {
         }
         String sql = builder.toString();
         try {
-            PreparedStatement prep = link.execute(sql, params, false, session);
-            int count = prep.executeUpdate();
-            link.reusePreparedStatement(prep, sql, session);
-            rowCount -= count;
+            if (link.isBatchDml(session)) {
+                link.executeDml(sql, params, session);
+                // exact removed count is only known at flush; adjust the
+                // cost-model statistic by one row
+                rowCount--;
+            } else {
+                PreparedStatement prep = link.execute(sql, params, false, session);
+                int count = prep.executeUpdate();
+                link.reusePreparedStatement(prep, sql, session);
+                rowCount -= count;
+            }
         } catch (Exception e) {
             throw TableLink.wrapException(sql, e);
         }
@@ -277,7 +284,7 @@ public class LinkedIndex extends Index {
         }
         String sql = builder.toString();
         try {
-            link.execute(sql, params, true, session);
+            link.executeDml(sql, params, session);
         } catch (Exception e) {
             throw TableLink.wrapException(sql, e);
         }

@@ -74,6 +74,16 @@ same SET statement. Explicit per-table `AUTOCOMMIT ON|OFF` always wins; the
 resolved value is persisted in the table's meta SQL. Same pattern applies to
 LINKED_TABLE_BATCH_SIZE in Phase 2.
 
+## ADR-12: BATCH requires AUTOCOMMIT OFF — accepted
+Batch state lives in the per-session TableLinkTransaction (a shared autocommit
+connection cannot hold per-session batches, and executeBatch on an autocommit
+connection would commit mid-statement). Explicit `BATCH n>1` on a
+non-transactional linked table fails at CREATE time; the global
+LINKED_TABLE_BATCH_SIZE default only applies to transactional tables.
+`BATCH 0|1` means no batching. The unflushed batch of a failed statement is
+discarded by SessionLocal.rollbackTo (statement-level savepoint rollback);
+already-flushed rows are undone by the remote transaction rollback.
+
 ## Phase-0 recon notes (verified against source)
 - LinkedIndex.add()/remove()/update() execute per-row via TableLink.execute();
   batching goes here (PLAN 2.1).
