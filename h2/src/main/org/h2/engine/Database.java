@@ -185,6 +185,13 @@ public final class Database implements DataHandler, CastDataProvider {
     private boolean optimizeReuseResults = true;
     private final String cacheType;
     private boolean referentialIntegrity = true;
+    /**
+     * Default for CREATE LINKED TABLE without an AUTOCOMMIT option (OSaaS
+     * fork). Set with SET LINKED_TABLE_TRANSACTIONAL (persisted) - a URL
+     * parameter of the same name is executed as that SET statement at session
+     * open, because the name is registered in SetTypes.
+     */
+    private boolean linkedTableTransactional;
     private Mode mode = Mode.getRegular();
     private DefaultNullOrdering defaultNullOrdering = DefaultNullOrdering.LOW;
     private int maxOperationMemory =
@@ -2026,6 +2033,26 @@ public final class Database implements DataHandler, CastDataProvider {
 
     public boolean getReferentialIntegrity() {
         return referentialIntegrity;
+    }
+
+    /**
+     * Set the default for CREATE LINKED TABLE without an explicit AUTOCOMMIT
+     * option: when true, new linked tables default to AUTOCOMMIT OFF
+     * (OSaaS fork, ADR-10).
+     *
+     * @param b the new value
+     */
+    public void setLinkedTableTransactional(boolean b) {
+        linkedTableTransactional = b;
+    }
+
+    /**
+     * Whether CREATE LINKED TABLE defaults to AUTOCOMMIT OFF (OSaaS fork).
+     *
+     * @return the current default
+     */
+    public boolean isLinkedTableTransactional() {
+        return linkedTableTransactional;
     }
 
     public void setQueryStatistics(boolean b) {

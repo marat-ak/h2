@@ -39,6 +39,54 @@ public class TestLinkedTableTransactional extends TestDb {
         testAutoCommitOffTransactional();
         testAutoCommitOffCommitPropagation();
         testAutoCommitOffSessionClose();
+        testLinkedTableTransactionalDefault();
+    }
+
+    /**
+     * PLAN 1.4: SET LINKED_TABLE_TRANSACTIONAL TRUE and the URL setting
+     * change the default for CREATE LINKED TABLE without an AUTOCOMMIT
+     * option; an explicit AUTOCOMMIT ON still overrides the default.
+     */
+    private void testLinkedTableTransactionalDefault() throws SQLException {
+        try (Connection remoteKeep = DriverManager.getConnection("jdbc:h2:mem:ltRemoteDef")) {
+            Statement remoteStat = remoteKeep.createStatement();
+            remoteStat.execute("CREATE TABLE TEST(ID INT)");
+            // via SET
+            try (Connection local = DriverManager.getConnection("jdbc:h2:mem:ltLocalDef")) {
+                Statement stat = local.createStatement();
+                stat.execute("SET LINKED_TABLE_TRANSACTIONAL TRUE");
+                stat.execute("CREATE LINKED TABLE LT('', 'jdbc:h2:mem:ltRemoteDef', '', '', 'TEST')");
+                assertTrue(getLinkedTableSql(stat).contains("AUTOCOMMIT OFF"));
+                local.setAutoCommit(false);
+                stat.execute("INSERT INTO LT VALUES(1)");
+                assertEquals(0, countRemote(remoteStat, "TEST"));
+                local.rollback();
+                assertEquals(0, countRemote(remoteStat, "TEST"));
+                local.setAutoCommit(true);
+                stat.execute("DROP TABLE LT");
+                // explicit AUTOCOMMIT ON overrides the global default
+                stat.execute("CREATE LINKED TABLE LT('', 'jdbc:h2:mem:ltRemoteDef', '', '', 'TEST') " +
+                        "AUTOCOMMIT ON");
+                String sql = getLinkedTableSql(stat);
+                assertTrue(sql, !sql.contains("AUTOCOMMIT"));
+                stat.execute("DROP TABLE LT");
+                // back to FALSE: new tables are non-transactional again
+                stat.execute("SET LINKED_TABLE_TRANSACTIONAL FALSE");
+                stat.execute("CREATE LINKED TABLE LT('', 'jdbc:h2:mem:ltRemoteDef', '', '', 'TEST')");
+                sql = getLinkedTableSql(stat);
+                assertTrue(sql, !sql.contains("AUTOCOMMIT"));
+                stat.execute("DROP TABLE LT");
+            }
+            // via URL setting
+            try (Connection local = DriverManager.getConnection(
+                    "jdbc:h2:mem:ltLocalDefUrl;LINKED_TABLE_TRANSACTIONAL=TRUE")) {
+                Statement stat = local.createStatement();
+                stat.execute("CREATE LINKED TABLE LT('', 'jdbc:h2:mem:ltRemoteDef', '', '', 'TEST')");
+                assertTrue(getLinkedTableSql(stat).contains("AUTOCOMMIT OFF"));
+                stat.execute("DROP TABLE LT");
+            }
+            remoteStat.execute("DROP TABLE TEST");
+        }
     }
 
     /**

@@ -375,6 +375,18 @@ public class Set extends Prepared {
             database.setReferentialIntegrity(value == 1);
             break;
         }
+        case SetTypes.LINKED_TABLE_TRANSACTIONAL: {
+            session.getUser().checkAdmin();
+            int value = getIntValue();
+            if (value < 0 || value > 1) {
+                throw DbException.getInvalidValueException("LINKED_TABLE_TRANSACTIONAL", value);
+            }
+            synchronized (database) {
+                database.setLinkedTableTransactional(value == 1);
+                addOrUpdateSetting(name, null, value);
+            }
+            break;
+        }
         case SetTypes.QUERY_STATISTICS: {
             session.getUser().checkAdmin();
             int value = getIntValue();

@@ -29,7 +29,8 @@ into one commit — resumability depends on commit granularity.
 - [x] 1.3 SessionLocal enlistment: commit → flush → remote commit → local
       commit; rollback → discard → remote rollback. Close/cleanup on session
       close, including error paths.
-- [ ] 1.4 Global default `SET LINKED_TABLE_TRANSACTIONAL TRUE` + URL setting.
+- [x] 1.4 Global default `SET LINKED_TABLE_TRANSACTIONAL TRUE` + URL setting.
+      (ADR-11: SetTypes-based; URL param executes as SET at session open.)
 - [ ] 1.5 Tests: DESIGN Tests #2, #6, #7 green.
 
 ## Phase 2 — Batched DML

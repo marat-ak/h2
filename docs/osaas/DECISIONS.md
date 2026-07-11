@@ -62,6 +62,18 @@ commit/rollback). Everywhere DESIGN.md says `TRANSACTIONAL`, read `AUTOCOMMIT
 OFF`. help.csv:880 already promises setAutoCommit passthrough, so this is a bug
 fix + semantics completion, upstream-friendly.
 
+## ADR-11: LINKED_TABLE_TRANSACTIONAL is a SET setting, not a DbSettings entry — accepted
+A name registered in SetTypes is automatically a "known setting" in
+ConnectionInfo.KNOWN_SETTINGS, which EXCLUDES it from DbSettings URL parsing;
+conversely a DbSettings name is skipped by the Engine session-init SET loop.
+Registering in both makes the setting dead in both paths. Decision: SetTypes
+only. `SET LINKED_TABLE_TRANSACTIONAL TRUE|FALSE` (admin, persisted in db
+meta) sets the Database-level default; a JDBC URL parameter
+`;LINKED_TABLE_TRANSACTIONAL=TRUE` is executed by Engine.openSession as that
+same SET statement. Explicit per-table `AUTOCOMMIT ON|OFF` always wins; the
+resolved value is persisted in the table's meta SQL. Same pattern applies to
+LINKED_TABLE_BATCH_SIZE in Phase 2.
+
 ## Phase-0 recon notes (verified against source)
 - LinkedIndex.add()/remove()/update() execute per-row via TableLink.execute();
   batching goes here (PLAN 2.1).

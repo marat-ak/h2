@@ -242,7 +242,12 @@ public class SetTypes {
      */
     public static final int TRUNCATE_LARGE_LENGTH = DEFAULT_NULL_ORDERING + 1;
 
-    private static final int COUNT = TRUNCATE_LARGE_LENGTH + 1;
+    /**
+     * The type of a SET LINKED_TABLE_TRANSACTIONAL statement (OSaaS fork).
+     */
+    public static final int LINKED_TABLE_TRANSACTIONAL = TRUNCATE_LARGE_LENGTH + 1;
+
+    private static final int COUNT = LINKED_TABLE_TRANSACTIONAL + 1;
 
     private static final ArrayList<String> TYPES;
 
@@ -298,6 +303,7 @@ public class SetTypes {
         list.add("VARIABLE_BINARY");
         list.add("DEFAULT_NULL_ORDERING");
         list.add("TRUNCATE_LARGE_LENGTH");
+        list.add("LINKED_TABLE_TRANSACTIONAL");
         TYPES = list;
         assert(list.size() == COUNT);
     }

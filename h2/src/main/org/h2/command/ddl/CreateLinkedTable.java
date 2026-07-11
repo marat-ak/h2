@@ -29,7 +29,11 @@ public class CreateLinkedTable extends SchemaCommand {
     private boolean globalTemporary;
     private boolean readOnly;
     private int fetchSize;
-    private boolean autocommit = true;
+    /**
+     * Explicit AUTOCOMMIT option, or null when not specified - in that case
+     * the database default LINKED_TABLE_TRANSACTIONAL applies (OSaaS fork).
+     */
+    private Boolean autocommit;
 
     public CreateLinkedTable(SessionLocal session, Schema schema) {
         super(session, schema);
@@ -102,7 +106,7 @@ public class CreateLinkedTable extends SchemaCommand {
         if (fetchSize > 0) {
             table.setFetchSize(fetchSize);
         }
-        table.setAutoCommit(autocommit);
+        table.setAutoCommit(autocommit != null ? autocommit : !db.isLinkedTableTransactional());
         if (temporary && !globalTemporary) {
             session.addLocalTempTable(table);
         } else {
