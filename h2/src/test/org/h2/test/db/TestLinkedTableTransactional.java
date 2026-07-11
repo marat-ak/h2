@@ -46,6 +46,47 @@ public class TestLinkedTableTransactional extends TestDb {
         testBatchOrderingMixedShapes();
         testBatchDdlAndValidation();
         testBatchStatementEndFlushAndDefault();
+        testBatchErrorMapping();
+    }
+
+    /**
+     * PLAN 2.3: a BatchUpdateException from the remote database is mapped to
+     * an SQLException carrying the remote message (error 90111, ERROR
+     * ACCESSING LINKED TABLE); the transaction stays open, rollback works and
+     * the connection remains usable.
+     */
+    private void testBatchErrorMapping() throws SQLException {
+        try (Connection remoteKeep = DriverManager.getConnection("jdbc:h2:mem:ltRemoteBerr")) {
+            Statement remoteStat = remoteKeep.createStatement();
+            remoteStat.execute("CREATE TABLE TEST(ID INT PRIMARY KEY, NAME VARCHAR)");
+            try (Connection local = DriverManager.getConnection("jdbc:h2:mem:ltLocalBerr")) {
+                Statement stat = local.createStatement();
+                stat.execute("CREATE LINKED TABLE LT('', 'jdbc:h2:mem:ltRemoteBerr', '', '', 'TEST') " +
+                        "AUTOCOMMIT OFF BATCH 10");
+                local.setAutoCommit(false);
+                try {
+                    // duplicate key inside one batch - fails on flush at
+                    // statement end
+                    stat.executeUpdate("INSERT INTO LT VALUES(1, 'a'), (1, 'b')");
+                    fail("expected duplicate-key failure from batched insert");
+                } catch (SQLException e) {
+                    // wrapped as ERROR_ACCESSING_LINKED_TABLE_2 with the
+                    // remote message preserved
+                    assertEquals(org.h2.api.ErrorCode.ERROR_ACCESSING_LINKED_TABLE_2, e.getErrorCode());
+                    assertContains(e.getMessage(), "23505");
+                }
+                // transaction still open; rollback undoes any flushed rows
+                local.rollback();
+                assertEquals(0, countRemote(remoteStat, "TEST"));
+                // connection still usable
+                stat.executeUpdate("INSERT INTO LT VALUES(2, 'c'), (3, 'd')");
+                local.commit();
+                assertEquals(2, countRemote(remoteStat, "TEST"));
+                local.setAutoCommit(true);
+                stat.execute("DROP TABLE LT");
+            }
+            remoteStat.execute("DROP TABLE TEST");
+        }
     }
 
     /**

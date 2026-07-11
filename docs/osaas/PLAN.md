@@ -40,7 +40,7 @@ into one commit — resumability depends on commit granularity.
 - [x] 2.2 Flush triggers: batch size, statement end, read of same table
       (read-your-writes), commit. `BATCH n` option + `SET
       LINKED_TABLE_BATCH_SIZE n` default.
-- [ ] 2.3 Error mapping: BatchUpdateException → DbException with remote
+- [x] 2.3 Error mapping: BatchUpdateException → DbException with remote
       message; connection usable after failure.
 - [ ] 2.4 Tests: DESIGN Tests #3, #4, #5 green; update counts verified.
 

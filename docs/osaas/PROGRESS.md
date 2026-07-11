@@ -14,7 +14,7 @@
 ## Status
 
 Current phase: 2 (batched DML)
-Next task: 2.3 batch error mapping test
+Next task: 2.4 Phase-2 test gate
 
 How to run a single H2 test class (no surefire):
 `cd h2 && ./mvnw -q test-compile && ./mvnw -q dependency:build-classpath -Dmdep.outputFile=target/cp.txt`
@@ -36,7 +36,8 @@ then `java -cp "target/classes;target/test-classes;$(cat target/cp.txt)" org.h2.
 | 2026-07-11 | 1.4 | SET LINKED_TABLE_TRANSACTIONAL TRUE|FALSE (SetTypes+Set, admin, persisted) drives CreateLinkedTable default when no AUTOCOMMIT option; URL param executes as SET at session open (ADR-11 — DbSettings+SetTypes double registration is dead in both paths). Tests: SET/URL default, explicit ON override, FALSE reset. TestLinkedTable green. | 4c30dda66 |
 | 2026-07-11 | 1.5 | Phase-1 gate green: DESIGN #2 (visibility/rollback, tasks 1.2-1.3 tests), new #6 error-path test (duplicate PK -> SQLException, tx stays open, rollback works, conn reusable), #7 TestLinkedTable + TestTransaction green. | 4dad1fe82 |
 | 2026-07-11 | 2.1 | Batch machinery: TableLinkTransaction.addBatch/flushBatch/discardBatch (shape-keyed stmt reuse, flush on shape change/size/any read; BatchUpdateException -> wrapException with getNextException); LinkedIndex add/remove/update route via TableLink.executeDml; BATCH n parser+DDL round-trip; BATCH>1 without AUTOCOMMIT OFF rejected (ADR-12). Tests: 12 rows/BATCH 5 -> 3 executeBatch calls, read-your-writes, mixed-shape ordering, rollback discards pending. | e5bff6fab |
-| 2026-07-11 | 2.2 | Statement-end flush in SessionLocal.endStatement (ADR-4: correct update counts); rollbackTo discards pending batch of failed statement; SET LINKED_TABLE_BATCH_SIZE n (SetTypes, admin, persisted) default for new transactional tables, explicit BATCH overrides, 0 disables. 2.1 accumulation test reworked to one multi-row INSERT (2 size flushes + 1 statement-end). All gates green. | (this commit) |
+| 2026-07-11 | 2.2 | Statement-end flush in SessionLocal.endStatement (ADR-4: correct update counts); rollbackTo discards pending batch of failed statement; SET LINKED_TABLE_BATCH_SIZE n (SetTypes, admin, persisted) default for new transactional tables, explicit BATCH overrides, 0 disables. 2.1 accumulation test reworked to one multi-row INSERT (2 size flushes + 1 statement-end). All gates green. | 2952f8176 |
+| 2026-07-11 | 2.3 | Batch error mapping test: duplicate key inside a batch surfaces as 90111 ERROR_ACCESSING_LINKED_TABLE_2 with remote message (23505) preserved; tx stays open, rollback undoes flushed rows, connection reusable (mapping code landed in 2.1). | (this commit) |
 
 ## Open issues / parked
 
