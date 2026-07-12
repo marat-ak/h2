@@ -14,7 +14,7 @@
 ## Status
 
 Current phase: 3 (Groovy blocks)
-Next task: 3.1 EXECUTE GROOVY statement
+Next task: 3.2 groovy binding tests + result handling
 
 How to run a single H2 test class (no surefire):
 `cd h2 && ./mvnw -q test-compile && ./mvnw -q dependency:build-classpath -Dmdep.outputFile=target/cp.txt`
@@ -38,7 +38,8 @@ then `java -cp "target/classes;target/test-classes;$(cat target/cp.txt)" org.h2.
 | 2026-07-11 | 2.1 | Batch machinery: TableLinkTransaction.addBatch/flushBatch/discardBatch (shape-keyed stmt reuse, flush on shape change/size/any read; BatchUpdateException -> wrapException with getNextException); LinkedIndex add/remove/update route via TableLink.executeDml; BATCH n parser+DDL round-trip; BATCH>1 without AUTOCOMMIT OFF rejected (ADR-12). Tests: 12 rows/BATCH 5 -> 3 executeBatch calls, read-your-writes, mixed-shape ordering, rollback discards pending. | e5bff6fab |
 | 2026-07-11 | 2.2 | Statement-end flush in SessionLocal.endStatement (ADR-4: correct update counts); rollbackTo discards pending batch of failed statement; SET LINKED_TABLE_BATCH_SIZE n (SetTypes, admin, persisted) default for new transactional tables, explicit BATCH overrides, 0 disables. 2.1 accumulation test reworked to one multi-row INSERT (2 size flushes + 1 statement-end). All gates green. | 2952f8176 |
 | 2026-07-11 | 2.3 | Batch error mapping test: duplicate key inside a batch surfaces as 90111 ERROR_ACCESSING_LINKED_TABLE_2 with remote message (23505) preserved; tx stays open, rollback undoes flushed rows, connection reusable (mapping code landed in 2.1). | 911933311 |
-| 2026-07-11 | 2.4 | Phase-2 gate green: DESIGN #3 (3 executeBatch calls for 12 rows/BATCH 5, update counts 12/3 correct), #4 (read-your-writes without extra flush), #5 (mixed-shape ordering); TestLinkedTableTransactional + TestLinkedTable + TestTransaction green. | (this commit) |
+| 2026-07-11 | 2.4 | Phase-2 gate green: DESIGN #3 (3 executeBatch calls for 12 rows/BATCH 5, update counts 12/3 correct), #4 (read-your-writes without extra flush), #5 (mixed-shape ordering); TestLinkedTableTransactional + TestLinkedTable + TestTransaction green. | d0800ed97 |
+| 2026-07-12 | 3.1 | EXECUTE GROOVY $$...$$ / '...' statement: Parser branch before IMMEDIATE; org.h2.command.dml.ExecuteGroovy compiles via new SourceCompiler.compileGroovyScript (reflection, groovy optional), SHA-256 source-hash class cache, admin check, SET GROOVY_BLOCKS kill switch (SetTypes, persisted). Binding conn/vars/log/sql already wired (tests in 3.2). groovy+groovy-sql added test-scope to pom. Missing-jar probe: clean 50100 "requires the Groovy jar". TestExecuteGroovy (scalar/admin/kill-switch) + TestLinkedTable green. | (this commit) |
 
 ## Open issues / parked
 

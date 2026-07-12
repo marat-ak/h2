@@ -198,6 +198,11 @@ public final class Database implements DataHandler, CastDataProvider {
      * Set with SET LINKED_TABLE_BATCH_SIZE.
      */
     private int linkedTableBatchSize = 1;
+    /**
+     * Kill switch for EXECUTE GROOVY (OSaaS fork, ADR-6). Default: enabled
+     * (the statement additionally requires admin rights).
+     */
+    private boolean groovyBlocksEnabled = true;
     private Mode mode = Mode.getRegular();
     private DefaultNullOrdering defaultNullOrdering = DefaultNullOrdering.LOW;
     private int maxOperationMemory =
@@ -2079,6 +2084,24 @@ public final class Database implements DataHandler, CastDataProvider {
      */
     public int getLinkedTableBatchSize() {
         return linkedTableBatchSize;
+    }
+
+    /**
+     * Enable or disable EXECUTE GROOVY (OSaaS fork, ADR-6).
+     *
+     * @param b the new value
+     */
+    public void setGroovyBlocksEnabled(boolean b) {
+        groovyBlocksEnabled = b;
+    }
+
+    /**
+     * Whether EXECUTE GROOVY is enabled (OSaaS fork).
+     *
+     * @return true if enabled
+     */
+    public boolean isGroovyBlocksEnabled() {
+        return groovyBlocksEnabled;
     }
 
     public void setQueryStatistics(boolean b) {

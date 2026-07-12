@@ -49,6 +49,7 @@ import org.h2.test.db.TestIgnoreCatalogs;
 import org.h2.test.db.TestIndex;
 import org.h2.test.db.TestIndexHints;
 import org.h2.test.db.TestLargeBlob;
+import org.h2.test.db.TestExecuteGroovy;
 import org.h2.test.db.TestLinkedTable;
 import org.h2.test.db.TestLinkedTableTransactional;
 import org.h2.test.db.TestListener;
@@ -735,6 +736,7 @@ kill -9 `jps -l | grep "org.h2.test." | cut -d " " -f 1`
             addTest(new TestIndex());
             addTest(new TestIndexHints());
             addTest(new TestLargeBlob());
+            addTest(new TestExecuteGroovy());
             addTest(new TestLinkedTable());
             addTest(new TestLinkedTableTransactional());
             addTest(new TestListener());

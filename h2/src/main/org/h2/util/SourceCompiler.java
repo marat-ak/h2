@@ -461,6 +461,20 @@ public class SourceCompiler {
 
 
     /**
+     * Compile a Groovy script source into a class (OSaaS fork, used by
+     * EXECUTE GROOVY). The Groovy jar is loaded by reflection and remains an
+     * optional dependency; without it a RuntimeException
+     * "Compile fail: no Groovy jar in the classpath" is thrown.
+     *
+     * @param source the Groovy script source (no //groovy prefix required)
+     * @param packageAndClassName the class name to compile as
+     * @return the compiled class (a groovy.lang.Script subclass for scripts)
+     */
+    public static Class<?> compileGroovyScript(String source, String packageAndClassName) {
+        return GroovyCompiler.parseClass(source, packageAndClassName);
+    }
+
+    /**
      * Access the Groovy compiler using reflection, so that we do not gain a
      * compile-time dependency unnecessarily.
      */

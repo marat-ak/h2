@@ -252,7 +252,12 @@ public class SetTypes {
      */
     public static final int LINKED_TABLE_BATCH_SIZE = LINKED_TABLE_TRANSACTIONAL + 1;
 
-    private static final int COUNT = LINKED_TABLE_BATCH_SIZE + 1;
+    /**
+     * The type of a SET GROOVY_BLOCKS statement (OSaaS fork).
+     */
+    public static final int GROOVY_BLOCKS = LINKED_TABLE_BATCH_SIZE + 1;
+
+    private static final int COUNT = GROOVY_BLOCKS + 1;
 
     private static final ArrayList<String> TYPES;
 
@@ -310,6 +315,7 @@ public class SetTypes {
         list.add("TRUNCATE_LARGE_LENGTH");
         list.add("LINKED_TABLE_TRANSACTIONAL");
         list.add("LINKED_TABLE_BATCH_SIZE");
+        list.add("GROOVY_BLOCKS");
         TYPES = list;
         assert(list.size() == COUNT);
     }

@@ -209,6 +209,7 @@ import org.h2.command.dml.Call;
 import org.h2.command.dml.CommandWithValues;
 import org.h2.command.dml.DataChangeStatement;
 import org.h2.command.dml.Delete;
+import org.h2.command.dml.ExecuteGroovy;
 import org.h2.command.dml.ExecuteImmediate;
 import org.h2.command.dml.ExecuteProcedure;
 import org.h2.command.dml.Explain;
@@ -693,7 +694,10 @@ public final class Parser extends ParserBase {
                 if (readIf("EXPLAIN")) {
                     c = parseExplain();
                 } else if (readIf("EXECUTE")) {
-                    if (readIf("IMMEDIATE")) {
+                    if (readIf("GROOVY")) {
+                        // OSaaS fork: EXECUTE GROOVY $$...$$ (or a string)
+                        c = new ExecuteGroovy(session, readString());
+                    } else if (readIf("IMMEDIATE")) {
                         c =  new ExecuteImmediate(session, readExpression());
                     } else if (database.getMode().getEnum() == ModeEnum.MSSQLServer) {
                         c = parseExecuteSQLServer();

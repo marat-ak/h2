@@ -141,6 +141,19 @@
       <artifactId>asm</artifactId>
       <scope>test</scope>
     </dependency>
+    <!-- OSaaS fork: EXECUTE GROOVY tests; groovy stays an optional runtime dep -->
+    <dependency>
+      <groupId>org.apache.groovy</groupId>
+      <artifactId>groovy</artifactId>
+      <version>4.0.21</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.groovy</groupId>
+      <artifactId>groovy-sql</artifactId>
+      <version>4.0.21</version>
+      <scope>test</scope>
+    </dependency>
     <!-- END TEST DEPENDENCIES !-->
   </dependencies>
 

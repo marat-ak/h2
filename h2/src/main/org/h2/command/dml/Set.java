@@ -399,6 +399,18 @@ public class Set extends Prepared {
             }
             break;
         }
+        case SetTypes.GROOVY_BLOCKS: {
+            session.getUser().checkAdmin();
+            int value = getIntValue();
+            if (value < 0 || value > 1) {
+                throw DbException.getInvalidValueException("GROOVY_BLOCKS", value);
+            }
+            synchronized (database) {
+                database.setGroovyBlocksEnabled(value == 1);
+                addOrUpdateSetting(name, null, value);
+            }
+            break;
+        }
         case SetTypes.QUERY_STATISTICS: {
             session.getUser().checkAdmin();
             int value = getIntValue();

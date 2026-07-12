@@ -557,6 +557,11 @@ public interface CommandInterface extends AutoCloseable {
     int DROP_MATERIALIZED_VIEW = 104;
 
     /**
+     * The type of an EXECUTE GROOVY statement (OSaaS fork).
+     */
+    int EXECUTE_GROOVY = 105;
+
+    /**
      * Get command type.
      *
      * @return one of the constants above

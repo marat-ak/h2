@@ -177,6 +177,12 @@ public final class SessionLocal extends Session implements TransactionStore.Roll
      * session is closed; commit/rollback is propagated to each of them.
      */
     private ArrayList<TableLinkTransaction> linkedTransactions;
+
+    /**
+     * Session-scoped variables shared between EXECUTE GROOVY blocks
+     * (OSaaS fork). Lazily created.
+     */
+    private HashMap<String, Object> groovyVars;
     private boolean autoCommitAtTransactionEnd;
     private String currentTransactionName;
     private volatile long cancelAtNs;
@@ -978,6 +984,19 @@ public final class SessionLocal extends Session implements TransactionStore.Roll
                 user = null;
             }
         }
+    }
+
+    /**
+     * The session-scoped variable map shared between EXECUTE GROOVY blocks
+     * (OSaaS fork).
+     *
+     * @return the map (never null)
+     */
+    public HashMap<String, Object> getGroovyVars() {
+        if (groovyVars == null) {
+            groovyVars = new HashMap<>();
+        }
+        return groovyVars;
     }
 
     /**

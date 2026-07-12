@@ -46,7 +46,7 @@ into one commit — resumability depends on commit granularity.
 
 ## Phase 3 — Groovy blocks
 
-- [ ] 3.1 `EXECUTE GROOVY $$...$$` statement: parser branch + command class
+- [x] 3.1 `EXECUTE GROOVY $$...$$` statement: parser branch + command class
       compiling via SourceCompiler (cache by source hash), admin check,
       `SET GROOVY_BLOCKS` kill switch (ADR-6).
 - [ ] 3.2 Binding: `sql`, `conn`, `vars` (session-scoped map), `log`.
