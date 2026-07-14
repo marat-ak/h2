@@ -53,7 +53,7 @@ into one commit — resumability depends on commit granularity.
       Result-set passthrough for ResultSet/List<Map> returns. (delivered in 3.1)
 - [x] 3.3 Marker preprocessing in RunScript + Shell:
       `<<groovy start>> ... <<groovy end>>` → EXECUTE GROOVY (ADR-7).
-- [ ] 3.4 Tests: DESIGN Feature-2 tests #1–#7, incl. combined
+- [x] 3.4 Tests: DESIGN Feature-2 tests #1–#7, incl. combined
       groovy-over-transactional-linked-table rollback test.
 
 ## Phase 4 — Release & integration
