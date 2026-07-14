@@ -223,6 +223,30 @@ public class Shell extends Tool implements Runnable {
                 if (trimmed.isEmpty()) {
                     continue;
                 }
+                // OSaaS fork: collect a <<groovy start>>..<<groovy end>> block
+                // and run it as one EXECUTE GROOVY statement (ADR-7)
+                if (statement == null) {
+                    String markerLower = StringUtils.toLowerEnglish(trimmed);
+                    if (markerLower.equals("<<groovy start>>") || markerLower.equals("<<groovy>>")) {
+                        StringBuilder groovy = new StringBuilder();
+                        while (true) {
+                            String bodyLine = readLine();
+                            if (bodyLine == null) {
+                                println("Unexpected end of input: '<<groovy end>>' missing");
+                                break;
+                            }
+                            if (StringUtils.toLowerEnglish(bodyLine.trim()).equals("<<groovy end>>")) {
+                                execute("EXECUTE GROOVY $$\n" + groovy + "\n$$");
+                                break;
+                            }
+                            if (groovy.length() > 0) {
+                                groovy.append('\n');
+                            }
+                            groovy.append(bodyLine);
+                        }
+                        continue;
+                    }
+                }
                 boolean end = trimmed.endsWith(";");
                 if (end) {
                     line = line.substring(0, line.lastIndexOf(';'));

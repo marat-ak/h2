@@ -49,9 +49,9 @@ into one commit — resumability depends on commit granularity.
 - [x] 3.1 `EXECUTE GROOVY $$...$$` statement: parser branch + command class
       compiling via SourceCompiler (cache by source hash), admin check,
       `SET GROOVY_BLOCKS` kill switch (ADR-6).
-- [ ] 3.2 Binding: `sql`, `conn`, `vars` (session-scoped map), `log`.
-      Result-set passthrough for ResultSet/List<Map> returns.
-- [ ] 3.3 Marker preprocessing in RunScript + Shell:
+- [x] 3.2 Binding: `sql`, `conn`, `vars` (session-scoped map), `log`.
+      Result-set passthrough for ResultSet/List<Map> returns. (delivered in 3.1)
+- [x] 3.3 Marker preprocessing in RunScript + Shell:
       `<<groovy start>> ... <<groovy end>>` → EXECUTE GROOVY (ADR-7).
 - [ ] 3.4 Tests: DESIGN Feature-2 tests #1–#7, incl. combined
       groovy-over-transactional-linked-table rollback test.

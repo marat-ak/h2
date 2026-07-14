@@ -19,6 +19,7 @@ import java.util.concurrent.TimeUnit;
 
 import org.h2.message.DbException;
 import org.h2.store.fs.FileUtils;
+import org.h2.util.GroovyScriptMarkers;
 import org.h2.util.IOUtils;
 import org.h2.util.JdbcUtils;
 import org.h2.util.ScriptReader;
@@ -157,6 +158,11 @@ public class RunScript extends Tool {
         // can not close the statement because we return a result set from it
         Statement stat = conn.createStatement();
         ResultSet rs = null;
+        try {
+            reader = GroovyScriptMarkers.wrap(reader);
+        } catch (IOException e) {
+            throw DbException.convertIOException(e, null);
+        }
         ScriptReader r = new ScriptReader(reader);
         while (true) {
             String sql = r.readStatement();
@@ -192,6 +198,9 @@ public class RunScript extends Tool {
     private void process(Connection conn, boolean continueOnError, String path,
             Reader reader, Charset charset) throws SQLException, IOException {
         Statement stat = conn.createStatement();
+        // OSaaS fork: rewrite <<groovy start>>..<<groovy end>> blocks to
+        // EXECUTE GROOVY before the statement splitter runs (ADR-7)
+        reader = GroovyScriptMarkers.wrap(reader);
         ScriptReader r = new ScriptReader(reader);
         while (true) {
             String sql = r.readStatement();
