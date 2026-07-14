@@ -58,10 +58,10 @@ into one commit — resumability depends on commit granularity.
 
 ## Phase 4 — Release & integration
 
-- [ ] 4.1 Version `2.2.224-osaas.1` in h2/pom.xml; build final jar.
-- [ ] 4.2 Fork README section: features, syntax, semantics, ADR-3 caveat.
+- [x] 4.1 Version `2.2.224-osaas.1` in h2/pom.xml; build final jar.
+- [x] 4.2 Fork README section: features, syntax, semantics, ADR-3 caveat.
 - [ ] 4.3 Full upstream test suite run; record deltas (goal: zero).
-- [ ] 4.4 Smoke doc for OSaaSIntegrationsH2: dependency swap + groovy jars.
+- [x] 4.4 Smoke doc for OSaaSIntegrationsH2: dependency swap + groovy jars.
 
 ## Verification gates
 

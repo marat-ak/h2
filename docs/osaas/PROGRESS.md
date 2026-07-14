@@ -44,6 +44,10 @@ then `java -cp "target/classes;target/test-classes;$(cat target/cp.txt)" org.h2.
 | 2026-07-14 | 3.3 | org.h2.util.GroovyScriptMarkers: rewrites `<<groovy start>>`..`<<groovy end>>` (case-insensitive, own-line; `<<groovy>>` alias) into `EXECUTE GROOVY $$..$$;` before the statement splitter. Wired into RunScript (both reader paths) and Shell (line-collect loop). Body must not contain `$$`. TestLinkedTable green (no regression on RunScript path). | 0572f79bd |
 | 2026-07-14 | 3.4 | TestExecuteGroovy extended to DESIGN Feature-2 #1-#7: scalar (#1), admin-denied (#5), kill switch (ADR-6), cursor-loop conditional DML via `sql` (#2), `vars` persist across blocks + session isolation (#4), marker rewrite unit + end-to-end RunScript marker script (#7), and combined Groovy-over-transactional-linked-table rollback/commit against a second embedded H2 (#3). All 8 pass with groovy 4.0.21 test-scope; TestLinkedTable green. Missing-jar path (#6) covered by 3.1 probe. | (this commit) |
 
+| 2026-07-14 | 4.1 | h2/pom.xml version -> 2.2.224-osaas.1; `./mvnw -DskipTests package` exit 0, produces h2/target/h2-2.2.224-osaas.1.jar. | (this commit) |
+| 2026-07-14 | 4.2 | README.md OSaaS fork section: both features, syntax, opt-in semantics, ADR-3 caveat, optional-Groovy note. | (this commit) |
+| 2026-07-14 | 4.4 | docs/osaas/OSAAS_INTEGRATION.md: build+install fork jar, version bump in OSaaSIntegrationsH2 pom, optional groovy/groovy-sql deps, enable options, smoke-check steps. | (this commit) |
+
 ## Open issues / parked
 
 (none yet)
